@@ -10,18 +10,18 @@
 #include <uct/base/uct_iface.h>
 
 
-#define UCT_CUDA_TL_NAME    "cuda"
+#define UCT_CUDA_TL_NAME    "gdr_copy"
 #define UCT_CUDA_DEV_NAME   "gpu0"
 
 
-typedef struct uct_cuda_iface {
+typedef struct uct_gdr_copy_iface {
     uct_base_iface_t        super;
-} uct_cuda_iface_t;
+} uct_gdr_copy_iface_t;
 
 
-typedef struct uct_cuda_iface_config {
+typedef struct uct_gdr_copy_iface_config {
     uct_iface_config_t      super;
-} uct_cuda_iface_config_t;
+} uct_gdr_copy_iface_config_t;
 
 
 #endif

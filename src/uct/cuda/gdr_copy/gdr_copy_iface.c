@@ -4,18 +4,18 @@
  * See file LICENSE for terms.
  */
 
-#include "cuda_iface.h"
-#include "cuda_md.h"
-#include "cuda_ep.h"
+#include "gdr_copy_iface.h"
+#include "gdr_copy_md.h"
+#include "gdr_copy_ep.h"
 
 #include <ucs/type/class.h>
 #include <ucs/sys/string.h>
 
 
-static ucs_config_field_t uct_cuda_iface_config_table[] = {
+static ucs_config_field_t uct_gdr_copy_iface_config_table[] = {
 
     {"", "", NULL,
-     ucs_offsetof(uct_cuda_iface_config_t, super),
+     ucs_offsetof(uct_gdr_copy_iface_config_t, super),
      UCS_CONFIG_TYPE_TABLE(uct_iface_config_table)},
 
     {NULL}
@@ -23,24 +23,24 @@ static ucs_config_field_t uct_cuda_iface_config_table[] = {
 
 
 /* Forward declaration for the delete function */
-static void UCS_CLASS_DELETE_FUNC_NAME(uct_cuda_iface_t)(uct_iface_t*);
+static void UCS_CLASS_DELETE_FUNC_NAME(uct_gdr_copy_iface_t)(uct_iface_t*);
 
 
-static ucs_status_t uct_cuda_iface_get_address(uct_iface_h tl_iface,
+static ucs_status_t uct_gdr_copy_iface_get_address(uct_iface_h tl_iface,
                                                uct_iface_addr_t *iface_addr)
 {
-    int *cuda_addr = (int*)iface_addr;
-    *cuda_addr = 0;
+    int *gdr_copy_addr = (int*)iface_addr;
+    *gdr_copy_addr = 0;
     return UCS_OK;
 }
 
-static int uct_cuda_iface_is_reachable(const uct_iface_h iface, const uct_device_addr_t *dev_addr,
+static int uct_gdr_copy_iface_is_reachable(const uct_iface_h iface, const uct_device_addr_t *dev_addr,
                                        const uct_iface_addr_t *iface_addr)
 {
     return 0;
 }
 
-static ucs_status_t uct_cuda_iface_query(uct_iface_h iface,
+static ucs_status_t uct_gdr_copy_iface_query(uct_iface_h iface,
                                          uct_iface_attr_t *iface_attr)
 {
     memset(iface_attr, 0, sizeof(uct_iface_attr_t));
@@ -84,30 +84,30 @@ static ucs_status_t uct_cuda_iface_query(uct_iface_h iface,
     return UCS_OK;
 }
 
-static uct_iface_ops_t uct_cuda_iface_ops = {
-    .ep_put_short             = uct_cuda_ep_put_short,
-    .ep_am_short              = uct_cuda_ep_am_short,
+static uct_iface_ops_t uct_gdr_copy_iface_ops = {
+    .ep_put_short             = uct_gdr_copy_ep_put_short,
+    .ep_am_short              = uct_gdr_copy_ep_am_short,
     .ep_flush                 = uct_base_ep_flush,
     .ep_fence                 = uct_base_ep_fence,
-    .ep_create_connected      = UCS_CLASS_NEW_FUNC_NAME(uct_cuda_ep_t),
-    .ep_destroy               = UCS_CLASS_DELETE_FUNC_NAME(uct_cuda_ep_t),
+    .ep_create_connected      = UCS_CLASS_NEW_FUNC_NAME(uct_gdr_copy_ep_t),
+    .ep_destroy               = UCS_CLASS_DELETE_FUNC_NAME(uct_gdr_copy_ep_t),
     .iface_flush              = uct_base_iface_flush,
     .iface_fence              = uct_base_iface_fence,
     .iface_progress_enable    = ucs_empty_function,
     .iface_progress_disable   = ucs_empty_function,
     .iface_progress           = ucs_empty_function_return_zero,
-    .iface_close              = UCS_CLASS_DELETE_FUNC_NAME(uct_cuda_iface_t),
-    .iface_query              = uct_cuda_iface_query,
+    .iface_close              = UCS_CLASS_DELETE_FUNC_NAME(uct_gdr_copy_iface_t),
+    .iface_query              = uct_gdr_copy_iface_query,
     .iface_get_device_address = (void*)ucs_empty_function_return_success,
-    .iface_get_address        = uct_cuda_iface_get_address,
-    .iface_is_reachable       = uct_cuda_iface_is_reachable,
+    .iface_get_address        = uct_gdr_copy_iface_get_address,
+    .iface_is_reachable       = uct_gdr_copy_iface_is_reachable,
 };
 
-static UCS_CLASS_INIT_FUNC(uct_cuda_iface_t, uct_md_h md, uct_worker_h worker,
+static UCS_CLASS_INIT_FUNC(uct_gdr_copy_iface_t, uct_md_h md, uct_worker_h worker,
                            const uct_iface_params_t *params,
                            const uct_iface_config_t *tl_config)
 {
-    UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_cuda_iface_ops, md, worker,
+    UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_gdr_copy_iface_ops, md, worker,
                               params, tl_config UCS_STATS_ARG(params->stats_root)
                               UCS_STATS_ARG(UCT_CUDA_TL_NAME));
 
@@ -119,18 +119,18 @@ static UCS_CLASS_INIT_FUNC(uct_cuda_iface_t, uct_md_h md, uct_worker_h worker,
     return UCS_OK;
 }
 
-static UCS_CLASS_CLEANUP_FUNC(uct_cuda_iface_t)
+static UCS_CLASS_CLEANUP_FUNC(uct_gdr_copy_iface_t)
 {
     /* tasks to tear down the domain */
 }
 
-UCS_CLASS_DEFINE(uct_cuda_iface_t, uct_base_iface_t);
-UCS_CLASS_DEFINE_NEW_FUNC(uct_cuda_iface_t, uct_iface_t, uct_md_h, uct_worker_h,
+UCS_CLASS_DEFINE(uct_gdr_copy_iface_t, uct_base_iface_t);
+UCS_CLASS_DEFINE_NEW_FUNC(uct_gdr_copy_iface_t, uct_iface_t, uct_md_h, uct_worker_h,
                           const uct_iface_params_t*, const uct_iface_config_t*);
-static UCS_CLASS_DEFINE_DELETE_FUNC(uct_cuda_iface_t, uct_iface_t);
+static UCS_CLASS_DEFINE_DELETE_FUNC(uct_gdr_copy_iface_t, uct_iface_t);
 
 
-static ucs_status_t uct_cuda_query_tl_resources(uct_md_h md,
+static ucs_status_t uct_gdr_copy_query_tl_resources(uct_md_h md,
                                                 uct_tl_resource_desc_t **resource_p,
                                                 unsigned *num_resources_p)
 {
@@ -153,11 +153,11 @@ static ucs_status_t uct_cuda_query_tl_resources(uct_md_h md,
     return UCS_OK;
 }
 
-UCT_TL_COMPONENT_DEFINE(uct_cuda_tl,
-                        uct_cuda_query_tl_resources,
-                        uct_cuda_iface_t,
+UCT_TL_COMPONENT_DEFINE(uct_gdr_copy_tl,
+                        uct_gdr_copy_query_tl_resources,
+                        uct_gdr_copy_iface_t,
                         UCT_CUDA_TL_NAME,
                         "CUDA_",
-                        uct_cuda_iface_config_table,
-                        uct_cuda_iface_config_t);
-UCT_MD_REGISTER_TL(&uct_cuda_md, &uct_cuda_tl);
+                        uct_gdr_copy_iface_config_table,
+                        uct_gdr_copy_iface_config_t);
+UCT_MD_REGISTER_TL(&uct_gdr_copy_md, &uct_gdr_copy_tl);

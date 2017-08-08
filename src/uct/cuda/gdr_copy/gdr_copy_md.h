@@ -11,6 +11,6 @@
 
 #define UCT_CUDA_MD_NAME           "gpu"
 
-extern uct_md_component_t uct_cuda_md;
+extern uct_md_component_t uct_gdr_copy_md;
 
 #endif
