@@ -194,6 +194,18 @@ libuct_la_SOURCES += \
     cuda/cuda_copy/cuda_copy_iface.c \
     cuda/cuda_copy/cuda_copy_ep.c
 
+if HAVE_GDR_COPY
+noinst_HEADERS += \
+    cuda/gdr_copy/gdr_copy_md.h \
+    cuda/gdr_copy/gdr_copy_iface.h \
+    cuda/gdr_copy/gdr_copy_ep.h
+
+libuct_la_SOURCES += \
+    cuda/gdr_copy/gdr_copy_md.c \
+    cuda/gdr_copy/gdr_copy_iface.c \
+    cuda/gdr_copy/gdr_copy_ep.c
+endif
+
 endif
 
 if HAVE_ROCM
