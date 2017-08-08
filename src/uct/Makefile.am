@@ -185,14 +185,15 @@ endif
 
 if HAVE_CUDA
 noinst_HEADERS += \
-    cuda/cuda_md.h \
-    cuda/cuda_iface.h \
-    cuda/cuda_ep.h
+    cuda/cuda_copy/cuda_copy_md.h \
+    cuda/cuda_copy/cuda_copy_iface.h \
+    cuda/cuda_copy/cuda_copy_ep.h
 
 libuct_la_SOURCES += \
-    cuda/cuda_md.c \
-    cuda/cuda_iface.c \
-    cuda/cuda_ep.c
+    cuda/cuda_copy/cuda_copy_md.c \
+    cuda/cuda_copy/cuda_copy_iface.c \
+    cuda/cuda_copy/cuda_copy_ep.c
+
 endif
 
 if HAVE_ROCM
