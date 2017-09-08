@@ -1273,6 +1273,18 @@ ucs_status_t uct_md_mem_dereg(uct_md_h md, uct_mem_h memh);
 
 /**
  * @ingroup UCT_MD
+ * @brief Detect memory on the memory domain.
+ *
+ *  Detect memory on the memory domain. Return memory domain in domain mask.
+ *
+ * @param [in]     md        Memory domain to register memory on.
+ * @param [in]     address   Memory address to detect.
+ * @param [out]    dn_mask   Filled with memory domain mask.
+ */
+ucs_status_t uct_md_mem_detect(uct_md_h md, void *addr, uint64_t *dn_mask);
+
+/**
+ * @ingroup UCT_MD
  * @brief Allocate memory for zero-copy communications and remote access.
  *
  * Allocate potentially registered memory. Every one of the provided allocation

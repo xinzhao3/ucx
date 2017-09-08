@@ -187,7 +187,8 @@ static ucs_status_t uct_knem_md_open(const char *md_name, const uct_md_config_t 
         .mem_free     = (void*)ucs_empty_function_return_success,
         .mkey_pack    = uct_knem_rkey_pack,
         .mem_reg      = uct_knem_mem_reg,
-        .mem_dereg    = uct_knem_mem_dereg
+        .mem_dereg    = uct_knem_mem_dereg,
+        .mem_detect   = ucs_empty_function_return_success
     };
 
     knem_md = ucs_malloc(sizeof(uct_knem_md_t), "uct_knem_md_t");

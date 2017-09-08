@@ -181,6 +181,7 @@ static ucs_status_t uct_ugni_md_open(const char *md_name, const uct_md_config_t 
         .mem_free     = (void*)ucs_empty_function,
         .mem_reg      = uct_ugni_mem_reg,
         .mem_dereg    = uct_ugni_mem_dereg,
+        .mem_detect   = ucs_empty_function_return_success,
         .mkey_pack     = uct_ugni_rkey_pack
     };
 

@@ -228,6 +228,7 @@ uct_md_ops_t uct_mm_md_ops = {
     .mem_free     = uct_mm_mem_free,
     .mem_reg      = uct_mm_mem_reg,
     .mem_dereg    = uct_mm_mem_dereg,
+    .mem_detect   = ucs_empty_function_return_success,
     .mkey_pack    = uct_mm_mkey_pack,
 };
 

@@ -59,7 +59,8 @@ static ucs_status_t uct_cma_md_open(const char *md_name, const uct_md_config_t *
         .mem_free     = (void*)ucs_empty_function_return_success,
         .mkey_pack    = (void*)ucs_empty_function_return_success,
         .mem_reg      = uct_cma_mem_reg,
-        .mem_dereg    = (void*)ucs_empty_function_return_success
+        .mem_dereg    = (void*)ucs_empty_function_return_success,
+        .mem_detect   = ucs_empty_function_return_success,
     };
     static uct_md_t md = {
         .ops          = &md_ops,

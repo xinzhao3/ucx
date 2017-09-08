@@ -228,6 +228,8 @@ static void ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep,
 #if ENABLE_ASSERT
     req->send.lane         = UCP_NULL_LANE;
 #endif
+
+    ucp_addr_domain_detect_mds(ep->worker->context, (void *)buffer, &(req->dn_mask));
 }
 
 UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,

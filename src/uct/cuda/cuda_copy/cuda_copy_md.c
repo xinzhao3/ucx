@@ -84,6 +84,39 @@ static ucs_status_t uct_cuda_copy_mem_dereg(uct_md_h md, uct_mem_h memh)
     return UCS_OK;
 }
 
+static ucs_status_t uct_cuda_copy_mem_detect(uct_md_h md, void *addr, uint64_t *dn_mask)
+{
+#if HAVE_CUDA
+    int memory_type;
+    cudaError_t cuda_err = cudaSuccess;
+    struct cudaPointerAttributes attributes;
+    CUresult cu_err = CUDA_SUCCESS;
+
+    (*dn_mask) = 0;
+
+    if (addr == NULL) {
+        return UCS_OK;
+    }
+
+    cu_err = cuPointerGetAttribute(&memory_type,
+                                   CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
+                                   (CUdeviceptr)addr);
+    if (cu_err != CUDA_SUCCESS) {
+        cuda_err = cudaPointerGetAttributes (&attributes, addr);
+        if (cuda_err == cudaSuccess) {
+            if (attributes.memoryType == cudaMemoryTypeDevice) {
+                (*dn_mask) = UCT_MD_ADDR_DOMAIN_CUDA;
+            }
+        }
+    } else if (memory_type == CU_MEMORYTYPE_DEVICE) {
+        (*dn_mask) = UCT_MD_ADDR_DOMAIN_CUDA;
+    }
+#else
+    (*dn_mask) = 0;
+#endif
+    return UCS_OK;
+}
+
 static ucs_status_t uct_cuda_copy_query_md_resources(uct_md_resource_desc_t **resources_p,
                                                 unsigned *num_resources_p)
 {
@@ -98,7 +131,8 @@ static ucs_status_t uct_cuda_copy_md_open(const char *md_name, const uct_md_conf
         .query        = uct_cuda_copy_md_query,
         .mkey_pack    = uct_cuda_copy_mkey_pack,
         .mem_reg      = uct_cuda_copy_mem_reg,
-        .mem_dereg    = uct_cuda_copy_mem_dereg
+        .mem_dereg    = uct_cuda_copy_mem_dereg,
+        .mem_detect   = uct_cuda_copy_mem_detect
     };
     static uct_md_t md = {
         .ops          = &md_ops,
