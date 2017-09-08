@@ -106,6 +106,29 @@ static ucs_status_t ucp_memh_reg_mds(ucp_context_h context, ucp_mem_h memh,
     return UCS_OK;
 }
 
+static ucs_status_t ucp_adddr_domain_detect_mds(ucp_context_h context, ucp_addr_dn_h addr_dn)
+{
+    ucs_status_t status;
+    unsigned md_index;
+    uint64_t dn_mask;
+
+    addr_dn->mask = 0;
+
+    for (md_index = 0; md_index < context->num_mds; ++md_index) {
+        if (context->tl_mds[md_index].attr.cap.flags & UCT_MD_FLAG_ADDR_DN) {
+            if(!(addr_dn->mask & context->tl_mds[md_index].attr.cap.addr_dn_mask)) {
+
+                status = uct_md_mem_detect(context->tl_mds[md_index].md, memh, memh->address,
+                        memh->length, &dn_mask);
+                if (status != UCS_OK) {
+                    return status;
+                }
+                addr_dn->mask |= dn_mask;
+            }
+        }
+    }
+    return UCS_OK;
+}
 /**
  * @return Whether MD number 'md_index' is selected by the configuration as part
  *         of allocation method number 'config_method_index'.
