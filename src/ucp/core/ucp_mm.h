@@ -72,6 +72,9 @@ void ucp_mpool_free(ucs_mpool_t *mp, void *chunk);
 
 void ucp_mpool_obj_init(ucs_mpool_t *mp, void *obj, void *chunk);
 
+ucs_status_t ucp_addr_domain_detect_mds(ucp_context_h context, void *addr,
+                                        ucp_addr_dn_h *addr_dn);
+
 static UCS_F_ALWAYS_INLINE uct_mem_h
 ucp_memh2uct(ucp_mem_h memh, ucp_md_index_t md_idx)
 {

@@ -506,3 +506,8 @@ ucs_status_t uct_md_mem_dereg(uct_md_h md, uct_mem_h memh)
 {
     return md->ops->mem_dereg(md, memh);
 }
+
+ucs_status_t uct_md_mem_detect(uct_md_h md, void *addr, uint64_t *dn_mask)
+{
+    return md->ops->mem_detect(md, addr, dn_mask);
+}

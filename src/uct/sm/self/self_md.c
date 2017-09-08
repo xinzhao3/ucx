@@ -42,7 +42,8 @@ static ucs_status_t uct_self_md_open(const char *md_name, const uct_md_config_t 
         .query        = uct_self_md_query,
         .mkey_pack    = ucs_empty_function_return_success,
         .mem_reg      = uct_self_mem_reg,
-        .mem_dereg    = ucs_empty_function_return_success
+        .mem_dereg    = ucs_empty_function_return_success,
+        .mem_detect   = ucs_empty_function_return_success
     };
     static uct_md_t md = {
         .ops          = &md_ops,

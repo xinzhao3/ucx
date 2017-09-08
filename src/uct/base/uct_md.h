@@ -130,6 +130,8 @@ struct uct_md_ops {
     ucs_status_t (*mem_dereg)(uct_md_h md, uct_mem_h memh);
 
     ucs_status_t (*mkey_pack)(uct_md_h md, uct_mem_h memh, void *rkey_buffer);
+
+    ucs_status_t (*mem_detect)(uct_md_h md, void *addr, uint64_t *dn_mask);
 };
 
 

@@ -858,6 +858,7 @@ static uct_md_ops_t uct_ib_md_ops = {
     .mem_alloc    = uct_ib_mem_alloc,
     .mem_free     = uct_ib_mem_free,
     .mem_reg      = uct_ib_mem_reg,
+    .mem_detect   = ucs_empty_function_return_success,
     .mem_dereg    = uct_ib_mem_dereg,
     .mem_advise   = uct_ib_mem_advise,
     .mkey_pack    = uct_ib_mkey_pack,
