@@ -30,6 +30,7 @@ static ucs_status_t uct_rocm_cma_md_query(uct_md_h md, uct_md_attr_t *md_attr)
     md_attr->rkey_packed_size  = sizeof(uct_rocm_cma_key_t);
     md_attr->cap.flags         = UCT_MD_FLAG_REG |
                                  UCT_MD_FLAG_NEED_RKEY;
+    md_attr->cap.addr_dn_mask = 0;
     md_attr->cap.max_alloc     = 0;
     md_attr->cap.max_reg       = ULONG_MAX;
 

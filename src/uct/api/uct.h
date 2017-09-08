@@ -324,9 +324,20 @@ enum {
     UCT_MD_FLAG_ADVISE     = UCS_BIT(4),  /**< MD supports memory advice */
     UCT_MD_FLAG_FIXED      = UCS_BIT(5),  /**< MD supports memory allocation with
                                                fixed address */
-    UCT_MD_FLAG_RKEY_PTR   = UCS_BIT(6)   /**< MD supports direct access to
+    UCT_MD_FLAG_RKEY_PTR   = UCS_BIT(6),   /**< MD supports direct access to
                                                remote memory via a pointer that
                                                is returned by @ref uct_rkey_ptr */
+    UCT_MD_FLAG_ADDR_DN    = UCS_BIT(7)   /**< MD supports memory addr domain 
+                                               detection */
+                                        
+};
+
+/*
+ * @ingroup UCT_MD
+ * @brief  Memory addr domoins.
+ */
+enum {
+   UCT_MD_ADDR_DOMAIN_CUDA = UCS_BIT(0)  /**< NVIDIA CUDA domain */
 };
 
 
@@ -522,6 +533,7 @@ struct uct_md_attr {
         size_t               max_alloc; /**< Maximal allocation size */
         size_t               max_reg;   /**< Maximal registration size */
         uint64_t             flags;     /**< UCT_MD_FLAG_xx */
+        uint64_t             addr_dn_mask; /**< Supported addr domains */
     } cap;
 
     uct_linear_growth_t      reg_cost;  /**< Memory registration cost estimation

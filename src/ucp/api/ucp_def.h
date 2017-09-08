@@ -136,6 +136,8 @@ typedef struct ucp_rkey                  *ucp_rkey_h;
  */
 typedef struct ucp_mem                   *ucp_mem_h;
 
+typedef uint64_t *ucp_addr_dn_h;
+
 
 /**
  * @ingroup UCP_MEM
