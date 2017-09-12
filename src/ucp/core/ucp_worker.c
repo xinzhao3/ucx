@@ -1098,6 +1098,7 @@ static void ucp_worker_destroy_eps(ucp_worker_h worker)
 
 void ucp_worker_destroy(ucp_worker_h worker)
 {
+    unsigned config_idx;
     ucs_trace_func("worker=%p", worker);
     ucp_worker_remove_am_handlers(worker);
     ucp_worker_destroy_eps(worker);
@@ -1113,6 +1114,9 @@ void ucp_worker_destroy(ucp_worker_h worker)
     kh_destroy_inplace(ucp_ep_errh_hash, &worker->ep_errh_hash);
     UCP_THREAD_LOCK_FINALIZE(&worker->mt_lock);
     UCS_STATS_NODE_FREE(worker->stats);
+    for (config_idx = 0; config_idx < worker->ep_config_count; ++config_idx) {
+        ucs_free(worker->ep_config[config_idx].dn);
+    }
     ucs_free(worker);
 }
 

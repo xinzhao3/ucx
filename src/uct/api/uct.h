@@ -534,6 +534,9 @@ struct uct_md_attr {
         size_t               max_reg;   /**< Maximal registration size */
         uint64_t             flags;     /**< UCT_MD_FLAG_xx */
         uint64_t             addr_dn_mask; /**< Supported addr domains */
+        struct {
+            size_t           max_short;
+        } eager;
     } cap;
 
     uct_linear_growth_t      reg_cost;  /**< Memory registration cost estimation
