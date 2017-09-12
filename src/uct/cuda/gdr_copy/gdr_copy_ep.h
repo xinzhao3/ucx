@@ -25,8 +25,9 @@ UCS_CLASS_DECLARE_NEW_FUNC(uct_gdr_copy_ep_t, uct_ep_t, uct_iface_t*,
                            const uct_device_addr_t *, const uct_iface_addr_t *);
 UCS_CLASS_DECLARE_DELETE_FUNC(uct_gdr_copy_ep_t, uct_ep_t);
 
-ucs_status_t uct_gdr_copy_ep_put_short(uct_ep_h tl_ep, const void *buffer, unsigned length, 
-                                   uint64_t remote_addr, uct_rkey_t rkey);
-ucs_status_t uct_gdr_copy_ep_am_short(uct_ep_h ep, uint8_t id, uint64_t header,
-                                  const void *payload, unsigned length);
+ucs_status_t uct_gdr_copy_ep_put_zcopy(uct_ep_h tl_ep,
+                                       const uct_iov_t *iov, size_t iovcnt,
+                                       uint64_t remote_addr, uct_rkey_t rkey,
+                                       uct_completion_t *comp);
+
 #endif

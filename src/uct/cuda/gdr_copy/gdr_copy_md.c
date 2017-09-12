@@ -15,6 +15,12 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+static ucs_config_field_t uct_gdr_copy_md_config_table[] = {
+    {"", "", NULL,
+    ucs_offsetof(uct_gdr_copy_md_config_t, super), UCS_CONFIG_TYPE_TABLE(uct_md_config_table)},
+
+    {NULL}
+};
 
 static ucs_status_t uct_gdr_copy_md_query(uct_md_h md, uct_md_attr_t *md_attr)
 {
@@ -50,32 +56,69 @@ static ucs_status_t uct_gdr_copy_rkey_release(uct_md_component_t *mdc, uct_rkey_
     return UCS_OK;
 }
 
-static ucs_status_t uct_gdr_copy_mem_reg(uct_md_h md, void *address, size_t length,
+
+static ucs_status_t uct_gdr_copy_mem_reg(uct_md_h uct_md, void *address, size_t length,
                                      unsigned flags, uct_mem_h *memh_p)
 {
-    ucs_status_t rc;
-    uct_mem_h * mem_hndl = NULL;
-    mem_hndl = ucs_malloc(sizeof(void *), "gdr_copy handle for test passing");
+    uct_gdr_copy_mem_h * mem_hndl = NULL;
+    uct_gdr_copy_md_t *md = ucs_derived_of(uct_md, uct_gdr_copy_md_t);
+    gdr_mh_t mh;
+    size_t reg_size;
+    void *bar_ptr;
+    
+    CUdeviceptr d_ptr = ((CUdeviceptr )(char *) address);
+
+    mem_hndl = ucs_malloc(sizeof(uct_gdr_copy_mem_h), "gdr_copy handle");
     if (NULL == mem_hndl) {
-      ucs_error("Failed to allocate memory for gni_mem_handle_t");
-      rc = UCS_ERR_NO_MEMORY;
-      goto mem_err;
+      ucs_error("Failed to allocate memory for uct_gdr_copy_mem_h");
+      return UCS_ERR_NO_MEMORY;
     }
+
+    reg_size = (length + GPU_PAGE_SIZE - 1) & GPU_PAGE_MASK;
+
+    if (gdr_pin_buffer(md->gdrcpy_ctx, (d_ptr & GPU_PAGE_MASK), reg_size, 0, 0, &mh) != 0) {
+        ucs_error("gdr_pin_buffer Failed. length :%lu pin_size:%lu ", length, reg_size);
+        return UCS_ERR_IO_ERROR;
+        
+    }
+    if (mh == 0) {
+        ucs_error("gdr_pin_buffer Failed. length :%lu pin_size:%lu ", length, reg_size);
+        return UCS_ERR_IO_ERROR;
+    }
+
+    if (gdr_map(md->gdrcpy_ctx, mh, &bar_ptr, reg_size) !=0) {
+        ucs_error("gdr_map failed. length :%lu pin_size:%lu ", length, reg_size);
+        return UCS_ERR_IO_ERROR;
+    }
+
+    mem_hndl->mh = mh;
+    mem_hndl->bar_ptr = bar_ptr;
+    mem_hndl->reg_size = reg_size;
+
     *memh_p = mem_hndl;
     return UCS_OK;
- mem_err:
-    return rc;
 }
 
-static ucs_status_t uct_gdr_copy_mem_dereg(uct_md_h md, uct_mem_h memh)
+static ucs_status_t uct_gdr_copy_mem_dereg(uct_md_h uct_md, uct_mem_h memh)
 {
-    ucs_free(memh);
+    uct_gdr_copy_md_t *md = ucs_derived_of(uct_md, uct_gdr_copy_md_t);
+    uct_gdr_copy_mem_h *mem_hndl = memh;
+
+    if (gdr_unmap(md->gdrcpy_ctx, mem_hndl->mh, mem_hndl->bar_ptr, mem_hndl->reg_size) !=0) {
+        ucs_error("gdr_unmap Failed. unpin_size:%lu ", mem_hndl->reg_size);
+        return UCS_ERR_IO_ERROR;
+    }
+    if (gdr_unpin_buffer(md->gdrcpy_ctx, mem_hndl->mh) !=0) {
+        ucs_error("gdr_unpin_buffer failed ");
+        return UCS_ERR_IO_ERROR;
+    }
+
+    free(mem_hndl);
     return UCS_OK;
 }
 
 static ucs_status_t uct_gdr_copy_mem_detect(uct_md_h md, void *addr, uint64_t *dn_mask)
 {
-#if HAVE_CUDA
     int memory_type;
     cudaError_t cuda_err = cudaSuccess;
     struct cudaPointerAttributes attributes;
@@ -100,40 +143,63 @@ static ucs_status_t uct_gdr_copy_mem_detect(uct_md_h md, void *addr, uint64_t *d
     } else if (memory_type == CU_MEMORYTYPE_DEVICE) {
         (*dn_mask) = UCT_MD_ADDR_DOMAIN_CUDA;
     }
-#else
-    (*dn_mask) = 0;
-#endif
+
     return UCS_OK;
 }
 
 static ucs_status_t uct_gdr_copy_query_md_resources(uct_md_resource_desc_t **resources_p,
                                                 unsigned *num_resources_p)
 {
-    return uct_single_md_resource(&uct_gdr_copy_md, resources_p, num_resources_p);
+
+    return uct_single_md_resource(&uct_gdr_copy_md_component, resources_p, num_resources_p);
+}
+
+static void uct_gdr_copy_md_close(uct_md_h uct_md)
+{
+    uct_gdr_copy_md_t *md = ucs_derived_of(uct_md, uct_gdr_copy_md_t);
+
+    if (gdr_close(md->gdrcpy_ctx) != 0) {
+        ucs_error("Failed to close gdrcopy");
+    }
+
+    ucs_free(md);
 }
 
 static ucs_status_t uct_gdr_copy_md_open(const char *md_name, const uct_md_config_t *md_config,
                                      uct_md_h *md_p)
 {
+    uct_gdr_copy_md_t *md;
+
     static uct_md_ops_t md_ops = {
-        .close        = (void*)ucs_empty_function,
+        .close        = uct_gdr_copy_md_close,
         .query        = uct_gdr_copy_md_query,
         .mkey_pack    = uct_gdr_copy_mkey_pack,
         .mem_reg      = uct_gdr_copy_mem_reg,
         .mem_dereg    = uct_gdr_copy_mem_dereg,
         .mem_detect   = uct_gdr_copy_mem_detect
     };
-    static uct_md_t md = {
-        .ops          = &md_ops,
-        .component    = &uct_gdr_copy_md
-    };
 
-    *md_p = &md;
+    md = ucs_malloc(sizeof(uct_gdr_copy_md_t), "uct_gdr_copy_md_t");
+    if (NULL == md) {
+        ucs_error("Failed to allocate memory for uct_gdr_copy_md_t");
+        return UCS_ERR_NO_MEMORY;
+    }
+
+    md->super.ops = &md_ops;
+    md->super.component = &uct_gdr_copy_md_component;
+
+    md->gdrcpy_ctx = gdr_open();
+    if (md->gdrcpy_ctx == (void *)0) {
+        ucs_error("Failed to open gdrcopy ");
+        return UCS_ERR_IO_ERROR;
+    }
+
+    *md_p = (uct_md_h) md;
     return UCS_OK;
 }
 
-UCT_MD_COMPONENT_DEFINE(uct_gdr_copy_md, UCT_CUDA_MD_NAME,
+UCT_MD_COMPONENT_DEFINE(uct_gdr_copy_md_component, UCT_GDR_COPY_MD_NAME,
                         uct_gdr_copy_query_md_resources, uct_gdr_copy_md_open, NULL,
-                        uct_gdr_copy_rkey_unpack, uct_gdr_copy_rkey_release, "CUDA_",
-                        uct_md_config_table, uct_md_config_t);
+                        uct_gdr_copy_rkey_unpack, uct_gdr_copy_rkey_release, "GDR_COPY_MD_",
+                        uct_gdr_copy_md_config_table, uct_gdr_copy_md_config_t);
 
