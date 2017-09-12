@@ -23,5 +23,4 @@ typedef struct uct_gdr_copy_iface_config {
     uct_iface_config_t      super;
 } uct_gdr_copy_iface_config_t;
 
-
 #endif

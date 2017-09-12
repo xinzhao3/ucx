@@ -85,8 +85,7 @@ static ucs_status_t uct_gdr_copy_iface_query(uct_iface_h iface,
 }
 
 static uct_iface_ops_t uct_gdr_copy_iface_ops = {
-    .ep_put_short             = uct_gdr_copy_ep_put_short,
-    .ep_am_short              = uct_gdr_copy_ep_am_short,
+    .ep_put_zcopy             = uct_gdr_copy_ep_put_zcopy,
     .ep_flush                 = uct_base_ep_flush,
     .ep_fence                 = uct_base_ep_fence,
     .ep_create_connected      = UCS_CLASS_NEW_FUNC_NAME(uct_gdr_copy_ep_t),
@@ -160,4 +159,4 @@ UCT_TL_COMPONENT_DEFINE(uct_gdr_copy_tl,
                         "CUDA_",
                         uct_gdr_copy_iface_config_table,
                         uct_gdr_copy_iface_config_t);
-UCT_MD_REGISTER_TL(&uct_gdr_copy_md, &uct_gdr_copy_tl);
+UCT_MD_REGISTER_TL(&uct_gdr_copy_md_component, &uct_gdr_copy_tl);
