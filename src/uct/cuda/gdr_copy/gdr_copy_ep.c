@@ -38,7 +38,7 @@ ucs_status_t uct_gdr_copy_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
 {
     uct_gdr_copy_iface_t *iface   = ucs_derived_of(tl_ep->iface, uct_gdr_copy_iface_t);
     uct_gdr_copy_md_t *md = (uct_gdr_copy_md_t *)iface->super.md;
-    uct_gdr_copy_mem_h *mem_hndl = (uct_gdr_copy_mem_h *) rkey;
+    uct_gdr_copy_mem_t *mem_hndl = (uct_gdr_copy_mem_t *) rkey;
     gdr_info_t gdr_info;
     size_t bar_off;
 
