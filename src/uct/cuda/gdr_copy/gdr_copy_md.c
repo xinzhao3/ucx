@@ -15,7 +15,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
-#define UCT_GDR_COPY_MD_RCACHE_DEFAULT_ALIGN (GPU_PAGE_SIZE)
+#define UCT_GDR_COPY_MD_RCACHE_DEFAULT_ALIGN 65536
 
 static ucs_config_field_t uct_gdr_copy_md_config_table[] = {
     {"", "", NULL,
