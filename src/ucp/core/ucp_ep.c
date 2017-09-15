@@ -859,6 +859,7 @@ void ucp_ep_config_init(ucp_worker_h worker, ucp_ep_config_t *config)
     size_t it;
     size_t max_rndv_thresh;
     size_t max_am_rndv_thresh;
+    size_t dn_num;
 
     /* Default settings */
     for (it = 0; it < UCP_MAX_IOV; ++it) {
@@ -957,15 +958,21 @@ void ucp_ep_config_init(ucp_worker_h worker, ucp_ep_config_t *config)
     }
 
     /* Configuration for memory domains */
-    config->dn = ucs_malloc(sizeof(ucp_ep_dn_config_t) * context->num_mds, "domain-specific configuration");
+    dn_num = 0;
     for (it = 0; it < context->num_mds; it++) {
         if (context->tl_mds[it].attr.cap.flags & UCT_MD_FLAG_ADDR_DN) {
-            config->dn[it].tag.eager.max_short = context->tl_mds[it].attr.cap.eager.max_short;
-            memset(config->dn[it].tag.eager.zcopy_thresh, 0, UCP_MAX_IOV * sizeof(size_t));
-        } else {
-            config->dn[it].tag.eager.max_short = config->tag.eager.max_short;
-            memcpy(config->dn[it].tag.eager.zcopy_thresh, config->tag.eager.zcopy_thresh,
-                   UCP_MAX_IOV * sizeof(size_t));
+            dn_num++;
+        }
+    }
+
+    config->dn = ucs_malloc(sizeof(ucp_ep_dn_config_t) * dn_num, "domain-specific configuration");
+
+    dn_num = 0;
+    for (it = 0; it < context->num_mds; it++) {
+        if (context->tl_mds[it].attr.cap.flags & UCT_MD_FLAG_ADDR_DN) {
+            config->dn[dn_num].tag.eager.max_short = context->tl_mds[it].attr.cap.eager.max_short;
+            memset(config->dn[dn_num].tag.eager.zcopy_thresh, 0, UCP_MAX_IOV * sizeof(size_t));
+            dn_num++;
         }
     }
 

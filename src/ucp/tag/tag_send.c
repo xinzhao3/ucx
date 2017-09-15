@@ -280,8 +280,8 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
     }
 
     ret = ucp_tag_send_req(req, count,
-                           ucp_ep_config(ep)->dn[md_index].tag.eager.max_short,
-                           ucp_ep_config(ep)->dn[md_index].tag.eager.zcopy_thresh,
+                           addr_dn.mask ? ucp_ep_config(ep)->dn[md_index].tag.eager.max_short : ucp_ep_config(ep)->tag.eager.max_short,
+                           addr_dn.mask ? ucp_ep_config(ep)->dn[md_index].tag.eager.zcopy_thresh : ucp_ep_config(ep)->tag.eager.zcopy_thresh,
                            ucp_ep_config(ep)->tag.rndv.rma_thresh,
                            ucp_ep_config(ep)->tag.rndv.am_thresh,
                            cb, ucp_ep_config(ep)->tag.proto);
