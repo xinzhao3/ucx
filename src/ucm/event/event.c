@@ -421,7 +421,9 @@ static ucs_status_t ucm_event_install(int events)
     ucm_debug("malloc hooks are ready");
 #if HAVE_CUDA
     
-    native_events = UCM_EVENT_CUDAFREE;    
+    if (events & UCM_EVENT_VM_UNMAPPED) {
+        native_events = UCM_EVENT_CUDAFREE;
+    }
     status = ucm_cudamem_install(native_events);
     if (status != UCS_OK) {
         ucm_debug("failed to install cudamem events");
