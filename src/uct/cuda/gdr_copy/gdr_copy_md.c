@@ -47,6 +47,7 @@ static ucs_status_t uct_gdr_copy_md_query(uct_md_h md, uct_md_attr_t *md_attr)
     md_attr->cap.addr_dn_mask  = UCT_MD_ADDR_DOMAIN_CUDA;
     md_attr->cap.max_alloc     = 0;
     md_attr->cap.max_reg       = ULONG_MAX;
+    md_attr->cap.eager.max_short = -1;
     md_attr->rkey_packed_size  = 0;
     md_attr->reg_cost.overhead = 0;
     md_attr->reg_cost.growth   = 0;

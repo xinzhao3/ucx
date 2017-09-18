@@ -105,6 +105,15 @@ typedef struct ucp_ep_rma_config {
 } ucp_ep_rma_config_t;
 
 
+typedef struct ucp_ep_dn_config {
+    struct {
+        struct {
+            ssize_t        max_short;
+            size_t         zcopy_thresh[UCP_MAX_IOV];
+        } eager;
+    } tag;
+} ucp_ep_dn_config_t;
+
 /*
  * Configuration for AM and tag offload protocols
  */
@@ -173,9 +182,12 @@ typedef struct ucp_ep_config {
         } offload;
     } tag;
 
+    /* Configuration of all domains */
+    ucp_ep_dn_config_t* dn;
+
 } ucp_ep_config_t;
 
-
+#define CONVERT_BITMASK_TO_INDEX(mask_, index_) { while (!(mask_ & 1)) {mask_ >>= 1; index_++;} }
 /**
  * Remote protocol layer endpoint
  */
