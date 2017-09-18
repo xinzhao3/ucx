@@ -9,7 +9,10 @@
 #define UCM_H_
 
 #include <ucs/sys/compiler_def.h>
-
+#if HAVE_CUDA
+#include <cuda_runtime.h>
+#include <cuda.h>
+#endif
 BEGIN_C_DECLS
 
 #include <ucs/config/types.h>
@@ -32,6 +35,7 @@ typedef enum ucm_event_type {
     UCM_EVENT_SHMAT           = UCS_BIT(3),
     UCM_EVENT_SHMDT           = UCS_BIT(4),
     UCM_EVENT_SBRK            = UCS_BIT(5),
+    UCM_EVENT_CUDAFREE        = UCS_BIT(6), 
 
     /* Aggregate events */
     UCM_EVENT_VM_MAPPED       = UCS_BIT(16),
@@ -112,6 +116,13 @@ typedef union ucm_event {
         void           *result;
         intptr_t       increment;
     } sbrk;
+
+#if HAVE_CUDA
+    struct {
+        int            result;
+        void     *address;
+    } cudaFree;
+#endif
 
     /*
      * UCM_EVENT_VM_MAPPED, UCM_EVENT_VM_UNMAPPED
@@ -295,6 +306,14 @@ int ucm_orig_shmdt(const void *shmaddr);
  * @brief Call the original implementation of @ref sbrk without triggering events.
  */
 void *ucm_orig_sbrk(intptr_t increment);
+
+#if HAVE_CUDA
+
+cudaError_t ucm_orig_cudaFree(void *address);
+
+cudaError_t ucm_cudaFree(void *address);
+
+#endif
 
 
 /**
