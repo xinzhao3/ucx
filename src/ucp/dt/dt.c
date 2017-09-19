@@ -48,62 +48,69 @@ size_t ucp_dt_pack(ucp_datatype_t datatype, void *dest, const void *src,
 
 
 static UCS_F_ALWAYS_INLINE ucs_status_t ucp_dn_dt_unpack(ucp_request_t *req, void *buffer, size_t buffer_size,
-                                                         const void *recv_data, size_t recv_length)
+        const void *recv_data, size_t recv_length)
 {
     ucp_worker_h worker = req->recv.worker;
     ucp_context_h context = worker->context;
     unsigned md_index;
     ucs_status_t status;
+    ucp_ep_h ep = ucp_worker_ep_find(worker, worker->uuid);
 
     for (md_index = 0; md_index < context->num_mds; md_index++) {
-        if (context->tl_mds[md_index].attr.cap.addr_dn_mask & req->dn_mask.mask) {
-            ucp_ep_h ep = ucp_worker_ep_find(worker, worker->uuid);
-            uct_mem_h memh;
-            uct_iov_t iov;
-            void *rkey_buffer;
-            size_t rkey_buffer_size;
-            ucp_rkey_h rkey;
-            ucp_lane_index_t lane;
 
-            status = uct_md_mem_reg(context->tl_mds[md_index].md, buffer, buffer_size,
-                                    0, &memh);
-            if (status != UCS_OK) {
-                uct_md_mem_dereg(context->tl_mds[md_index].md, memh);
-                ucs_error("Failed to reg address %p with md %s", buffer,
-                          context->tl_mds[md_index].rsc.md_name);
-                return status;
-            }
-
-            ucp_rkey_pack(context, memh, &rkey_buffer, &rkey_buffer_size);
-            ucp_ep_rkey_unpack(ep, rkey_buffer, &rkey);
-            ucp_rkey_buffer_release(rkey_buffer);
-
-            iov.buffer = buffer;
-            iov.length = buffer_size;
-            iov.count  = 1;
-            iov.memh   = memh;
-
-            lane = rkey->cache.rma_lane;
-
-            status = uct_ep_put_zcopy(ep->uct_eps[lane], &iov, 1, (uint64_t)recv_data,
-                                      rkey->cache.rma_rkey, NULL);
-            if (status != UCS_OK) {
-                ucp_rkey_destroy(rkey);
-                uct_md_mem_dereg(context->tl_mds[md_index].md, memh);
-                ucs_error("Failed to perform uct_ep_put_zcopy to address %p", recv_data);
-                return status;
-            }
-
-            ucp_rkey_destroy(rkey);
-
-            status = uct_md_mem_dereg(context->tl_mds[md_index].md, memh);
-            if (status != UCS_OK) {
-                ucs_error("Failed to dereg address %p with md %s", buffer,
-                          context->tl_mds[md_index].rsc.md_name);
-                return status;
-            }
-            break;
+        if (!(UCS_BIT(md_index) & req->addr_dn_h->md_map)) {
+            continue;
         }
+
+        /*TODO check if put-zcopy there on iface */
+
+        uct_mem_h memh;
+        uct_iov_t iov;
+
+        //           void *rkey_buffer;
+        //           size_t rkey_buffer_size;
+        //           ucp_rkey_h rkey;
+        //           ucp_lane_index_t lane;
+
+        status = uct_md_mem_reg(context->tl_mds[md_index].md, buffer, buffer_size,
+                0, &memh);
+        if (status != UCS_OK) {
+            uct_md_mem_dereg(context->tl_mds[md_index].md, memh);
+            ucs_error("Failed to reg address %p with md %s", buffer,
+                    context->tl_mds[md_index].rsc.md_name);
+            return status;
+        }
+
+        // ucp_rkey_pack(context, memh, &rkey_buffer, &rkey_buffer_size);
+        // ucp_ep_rkey_unpack(ep, rkey_buffer, &rkey);
+        // ucp_rkey_buffer_release(rkey_buffer);
+
+        ucs_assert(buffer_size >= recv_length);
+        iov.buffer = (void *)recv_data;
+        iov.length = recv_length;
+        iov.count  = 1;
+        iov.memh   = UCT_MEM_HANDLE_NULL;
+
+        //lane = rkey->cache.rma_lane;
+
+        status = uct_ep_put_zcopy(ep->uct_eps[0], &iov, 1, (uint64_t)buffer,
+                (uct_rkey_t )memh, NULL);
+        if (status != UCS_OK) {
+            // ucp_rkey_destroy(rkey);
+            uct_md_mem_dereg(context->tl_mds[md_index].md, memh);
+            ucs_error("Failed to perform uct_ep_put_zcopy to address %p", recv_data);
+            return status;
+        }
+
+        //ucp_rkey_destroy(rkey);
+
+        status = uct_md_mem_dereg(context->tl_mds[md_index].md, memh);
+        if (status != UCS_OK) {
+            ucs_error("Failed to dereg address %p with md %s", buffer,
+                    context->tl_mds[md_index].rsc.md_name);
+            return status;
+        }
+        break;
     }
 
     return UCS_OK;
@@ -128,7 +135,7 @@ ucs_status_t ucp_dt_unpack(ucp_request_t *req, ucp_datatype_t datatype, void *bu
 
     switch (datatype & UCP_DATATYPE_CLASS_MASK) {
     case UCP_DATATYPE_CONTIG:
-        if (!(req->dn_mask.mask)) {
+        if (req->addr_dn_h == &ucp_addr_dn_dummy_handle) {
             UCS_PROFILE_NAMED_CALL("memcpy_recv", memcpy, buffer + offset,
                                    recv_data, recv_length);
             return UCS_OK;

@@ -214,7 +214,7 @@ ucp_tag_send_req(ucp_request_t *req, size_t count, ssize_t max_short,
 static void ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep,
                                   const void* buffer, uintptr_t datatype,
                                   ucp_tag_t tag, uint16_t flags,
-                                  ucp_addr_dn_h addr_dn)
+                                  ucp_addr_dn_h addr_dn_h)
 {
     req->flags             = flags;
     req->send.ep           = ep;
@@ -223,7 +223,7 @@ static void ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep,
     req->send.tag          = tag;
     req->send.reg_rsc      = UCP_NULL_RESOURCE;
     req->send.state.offset = 0;
-    req->dn_mask           = addr_dn;
+    req->addr_dn_h           = addr_dn_h;
     VALGRIND_MAKE_MEM_UNDEFINED(&req->send.uct_comp.count,
                                 sizeof(req->send.uct_comp.count));
 
@@ -241,18 +241,16 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
     ucp_request_t *req;
     size_t length;
     ucs_status_ptr_t ret;
-    ucp_addr_dn_h addr_dn;
-    uint64_t mask;
-    unsigned md_index;
+    ucp_addr_dn_h addr_dn_h;
 
     UCP_THREAD_CS_ENTER_CONDITIONAL(&ep->worker->mt_lock);
 
     ucs_trace_req("send_nb buffer %p count %zu tag %"PRIx64" to %s cb %p",
                   buffer, count, tag, ucp_ep_peer_name(ep), cb);
 
-    ucp_addr_domain_detect_mds(ep->worker->context, (void *)buffer, &addr_dn);
+    ucp_addr_domain_detect_mds(ep->worker->context, (void *)buffer, &addr_dn_h);
 
-    if (!addr_dn.mask && ucs_likely(UCP_DT_IS_CONTIG(datatype))) {
+    if (addr_dn_h->id == UCT_MD_ADDR_DOMAIN_DEFAULT && ucs_likely(UCP_DT_IS_CONTIG(datatype))) {
         length = ucp_contig_dt_length(datatype, count);
         if (ucs_likely((ssize_t)length <= ucp_ep_config(ep)->tag.eager.max_short)) {
             status = UCS_PROFILE_CALL(ucp_tag_send_eager_short, ep, tag, buffer,
@@ -271,17 +269,11 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
         goto out;
     }
 
-    ucp_tag_send_req_init(req, ep, buffer, datatype, tag, 0, addr_dn);
-
-    mask = addr_dn.mask;
-    md_index = 0;
-    if (addr_dn.mask) {
-        CONVERT_BITMASK_TO_INDEX(mask, md_index);
-    }
+    ucp_tag_send_req_init(req, ep, buffer, datatype, tag, 0, addr_dn_h);
 
     ret = ucp_tag_send_req(req, count,
-                           addr_dn.mask ? ucp_ep_config(ep)->dn[md_index].tag.eager.max_short : ucp_ep_config(ep)->tag.eager.max_short,
-                           addr_dn.mask ? ucp_ep_config(ep)->dn[md_index].tag.eager.zcopy_thresh : ucp_ep_config(ep)->tag.eager.zcopy_thresh,
+                           addr_dn_h->id != UCT_MD_ADDR_DOMAIN_DEFAULT ? ucp_ep_config(ep)->dn[addr_dn_h->id].tag.eager.max_short : ucp_ep_config(ep)->tag.eager.max_short,
+                           addr_dn_h->id != UCT_MD_ADDR_DOMAIN_DEFAULT ? ucp_ep_config(ep)->dn[addr_dn_h->id].tag.eager.zcopy_thresh : ucp_ep_config(ep)->tag.eager.zcopy_thresh,
                            ucp_ep_config(ep)->tag.rndv.rma_thresh,
                            ucp_ep_config(ep)->tag.rndv.am_thresh,
                            cb, ucp_ep_config(ep)->tag.proto);
@@ -297,7 +289,6 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
 {
     ucp_request_t *req;
     ucs_status_ptr_t ret;
-    ucp_addr_dn_h addr_dn;
 
     UCP_THREAD_CS_ENTER_CONDITIONAL(&ep->worker->mt_lock);
 
@@ -318,10 +309,9 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
     /* Remote side needs to send reply, so have it connect to us */
     ucp_ep_connect_remote(ep);
 
-    ucp_addr_domain_detect_mds(ep->worker->context, (void *)buffer, &addr_dn);
 
     ucp_tag_send_req_init(req, ep, buffer, datatype, tag, UCP_REQUEST_FLAG_SYNC,
-                          addr_dn);
+                          &ucp_addr_dn_dummy_handle);
 
     ret = ucp_tag_send_req(req, count,
                            -1, /* disable short method */
