@@ -47,7 +47,7 @@ static ucs_config_field_t uct_gdr_copy_md_config_table[] = {
 static ucs_status_t uct_gdr_copy_md_query(uct_md_h md, uct_md_attr_t *md_attr)
 {
     md_attr->cap.flags         = UCT_MD_FLAG_REG | UCT_MD_FLAG_ADDR_DN;
-    md_attr->cap.addr_dn_mask  = UCT_MD_ADDR_DOMAIN_CUDA;
+    md_attr->cap.addr_dn       = UCT_MD_ADDR_DOMAIN_CUDA;
     md_attr->cap.max_alloc     = 0;
     md_attr->cap.max_reg       = ULONG_MAX;
     md_attr->cap.eager.max_short = -1;
@@ -164,17 +164,15 @@ static ucs_status_t uct_gdr_copy_mem_dereg(uct_md_h uct_md, uct_mem_h memh)
     return status;
 }
 
-static ucs_status_t uct_gdr_copy_mem_detect(uct_md_h md, void *addr, uint64_t *dn_mask)
+static ucs_status_t uct_gdr_copy_mem_detect(uct_md_h md, void *addr)
 {
     int memory_type;
     cudaError_t cuda_err = cudaSuccess;
     struct cudaPointerAttributes attributes;
     CUresult cu_err = CUDA_SUCCESS;
 
-    (*dn_mask) = 0;
-
     if (addr == NULL) {
-        return UCS_OK;
+        return UCS_ERR_INVALID_ADDR;
     }
 
     cu_err = cuPointerGetAttribute(&memory_type,
@@ -184,14 +182,14 @@ static ucs_status_t uct_gdr_copy_mem_detect(uct_md_h md, void *addr, uint64_t *d
         cuda_err = cudaPointerGetAttributes (&attributes, addr);
         if (cuda_err == cudaSuccess) {
             if (attributes.memoryType == cudaMemoryTypeDevice) {
-                (*dn_mask) = UCT_MD_ADDR_DOMAIN_CUDA;
+                return UCS_OK;
             }
         }
     } else if (memory_type == CU_MEMORYTYPE_DEVICE) {
-        (*dn_mask) = UCT_MD_ADDR_DOMAIN_CUDA;
+        return UCS_OK;
     }
 
-    return UCS_OK;
+    return UCS_ERR_INVALID_ADDR;
 }
 
 static ucs_status_t uct_gdr_copy_query_md_resources(uct_md_resource_desc_t **resources_p,

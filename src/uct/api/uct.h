@@ -336,9 +336,12 @@ enum {
  * @ingroup UCT_MD
  * @brief  Memory addr domoins.
  */
-enum {
-   UCT_MD_ADDR_DOMAIN_CUDA = UCS_BIT(0)  /**< NVIDIA CUDA domain */
-};
+typedef enum {
+    UCT_MD_ADDR_DOMAIN_CUDA = 0,  /**< NVIDIA CUDA domain */
+    UCT_MD_ADDR_DOMAIN_DEFAULT,   /**< Default system domain */
+    UCT_MD_ADDR_DOMAIN_LAST = UCT_MD_ADDR_DOMAIN_DEFAULT
+     
+} uct_addr_domain_t;
 
 
 /**
@@ -533,7 +536,7 @@ struct uct_md_attr {
         size_t               max_alloc; /**< Maximal allocation size */
         size_t               max_reg;   /**< Maximal registration size */
         uint64_t             flags;     /**< UCT_MD_FLAG_xx */
-        uint64_t             addr_dn_mask; /**< Supported addr domains */
+        uct_addr_domain_t    addr_dn;   /**< Supported addr domain */
         struct {
             size_t           max_short;
         } eager;
@@ -1278,13 +1281,13 @@ ucs_status_t uct_md_mem_dereg(uct_md_h md, uct_mem_h memh);
  * @ingroup UCT_MD
  * @brief Detect memory on the memory domain.
  *
- *  Detect memory on the memory domain. Return memory domain in domain mask.
+ *  Detect memory on the memory domain.
+ *  Return UCS_OK if address belongs to MDs address domain
  *
  * @param [in]     md        Memory domain to register memory on.
  * @param [in]     address   Memory address to detect.
- * @param [out]    dn_mask   Filled with memory domain mask.
  */
-ucs_status_t uct_md_mem_detect(uct_md_h md, void *addr, uint64_t *dn_mask);
+ucs_status_t uct_md_mem_detect(uct_md_h md, void *addr);
 
 /**
  * @ingroup UCT_MD

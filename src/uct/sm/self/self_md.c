@@ -10,7 +10,7 @@ static ucs_status_t uct_self_md_query(uct_md_h md, uct_md_attr_t *attr)
 {
     /* Dummy memory registration provided. No real memory handling exists */
     attr->cap.flags         = UCT_MD_FLAG_REG;
-    attr->cap.addr_dn_mask = 0;
+    attr->cap.addr_dn       = UCT_MD_ADDR_DOMAIN_DEFAULT;
     attr->cap.max_alloc     = 0;
     attr->cap.max_reg       = ULONG_MAX;
     attr->rkey_packed_size  = 0; /* uct_md_query adds UCT_MD_COMPONENT_NAME_MAX to this */
