@@ -15,11 +15,14 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
-#define UCT_GDR_COPY_MD_RCACHE_DEFAULT_ALIGN 65536
+#define UCT_GDR_COPY_MD_RCACHE_DEFAULT_ALIGN 4096
 
 static ucs_config_field_t uct_gdr_copy_md_config_table[] = {
     {"", "", NULL,
         ucs_offsetof(uct_gdr_copy_md_config_t, super), UCS_CONFIG_TYPE_TABLE(uct_md_config_table)},
+
+    {"RCACHE", "try", "Enable using memory registration cache",
+        ucs_offsetof(uct_gdr_copy_md_config_t, rcache.enable), UCS_CONFIG_TYPE_TERNARY},
 
     {"RCACHE_ADDR_ALIGN", UCS_PP_MAKE_STRING(UCT_GDR_COPY_MD_RCACHE_DEFAULT_ALIGN),
         "Registration cache address alignment, must be power of 2\n"
@@ -202,6 +205,10 @@ static void uct_gdr_copy_md_close(uct_md_h uct_md)
 {
     uct_gdr_copy_md_t *md = ucs_derived_of(uct_md, uct_gdr_copy_md_t);
 
+    if (md->rcache != NULL) {
+        ucs_rcache_destroy(md->rcache);
+    }
+
     if (gdr_close(md->gdrcpy_ctx) != 0) {
         ucs_error("Failed to close gdrcopy");
     }
@@ -359,6 +366,6 @@ static ucs_status_t uct_gdr_copy_md_open(const char *md_name, const uct_md_confi
 
 UCT_MD_COMPONENT_DEFINE(uct_gdr_copy_md_component, UCT_GDR_COPY_MD_NAME,
                         uct_gdr_copy_query_md_resources, uct_gdr_copy_md_open, NULL,
-                        uct_gdr_copy_rkey_unpack, uct_gdr_copy_rkey_release, "GDR_COPY_MD_",
+                        uct_gdr_copy_rkey_unpack, uct_gdr_copy_rkey_release, "GDR_COPY_",
                         uct_gdr_copy_md_config_table, uct_gdr_copy_md_config_t);
 
