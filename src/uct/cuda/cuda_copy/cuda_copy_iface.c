@@ -83,10 +83,31 @@ static ucs_status_t uct_cuda_copy_iface_query(uct_iface_h iface,
 
     return UCS_OK;
 }
+static unsigned uct_cuda_copy_iface_progress(uct_iface_h tl_iface)
+{
+    uct_cuda_copy_iface_t *iface = ucs_derived_of(tl_iface, uct_cuda_copy_iface_t);
+    unsigned count = 0;
+
+    ucs_queue_iter_t iter;
+    uct_cuda_copy_event_desc_t *cuda_event;
+    cudaError_t result = cudaSuccess;
+
+    ucs_queue_for_each_safe(cuda_event, iter, &iface->pending_event_q, queue)
+    {
+        result = cudaEventQuery(cuda_event->event);
+        if (cudaSuccess == result) {
+            ucs_queue_del_iter(&iface->pending_event_q, iter);
+            cuda_event->comp->func(cuda_event->comp, UCS_OK);
+            ucs_info("Event Done :%p", cuda_event);
+            ucs_mpool_put(cuda_event);
+            count++;
+        }
+    }
+    return count;
+}
 
 static uct_iface_ops_t uct_cuda_copy_iface_ops = {
-    .ep_put_short             = uct_cuda_copy_ep_put_short,
-    .ep_am_short              = uct_cuda_copy_ep_am_short,
+    .ep_get_zcopy             = uct_cuda_copy_ep_get_zcopy,
     .ep_flush                 = uct_base_ep_flush,
     .ep_fence                 = uct_base_ep_fence,
     .ep_create_connected      = UCS_CLASS_NEW_FUNC_NAME(uct_cuda_copy_ep_t),
@@ -95,7 +116,7 @@ static uct_iface_ops_t uct_cuda_copy_iface_ops = {
     .iface_fence              = uct_base_iface_fence,
     .iface_progress_enable    = ucs_empty_function,
     .iface_progress_disable   = ucs_empty_function,
-    .iface_progress           = ucs_empty_function_return_zero,
+    .iface_progress           = uct_cuda_copy_iface_progress,
     .iface_close              = UCS_CLASS_DELETE_FUNC_NAME(uct_cuda_copy_iface_t),
     .iface_query              = uct_cuda_copy_iface_query,
     .iface_get_device_address = (void*)ucs_empty_function_return_success,
@@ -103,17 +124,72 @@ static uct_iface_ops_t uct_cuda_copy_iface_ops = {
     .iface_is_reachable       = uct_cuda_copy_iface_is_reachable,
 };
 
+void uct_cuda_copy_event_desc_init(ucs_mpool_t *mp, void *obj, void *chunk)
+{
+    uct_cuda_copy_event_desc_t *base = (uct_cuda_copy_event_desc_t *) obj;
+    ucs_status_t status;
+    memset(base, 0 , sizeof(*base));
+    status = CUDA_FUNC(cudaEventCreateWithFlags(&(base->event), cudaEventDisableTiming));
+    if (UCS_OK != status) {
+        ucs_error("cudaEventCreateWithFlags Failed");
+    }
+}
+void uct_cuda_copy_event_desc_cleanup(ucs_mpool_t *mp, void *obj)
+{
+    ucs_status_t status;
+    uct_cuda_copy_event_desc_t *base = (uct_cuda_copy_event_desc_t *) obj;
+    status = CUDA_FUNC(cudaEventDestroy(base->event));
+    if (UCS_OK != status) {
+        ucs_error("cudaEventDestroy Failed");
+    }
+}
+
+static ucs_mpool_ops_t uct_cuda_copy_event_desc_mpool_ops = {
+    .chunk_alloc   = ucs_mpool_hugetlb_malloc,
+    .chunk_release = ucs_mpool_hugetlb_free,
+    .obj_init      = uct_cuda_copy_event_desc_init,
+    .obj_cleanup   = uct_cuda_copy_event_desc_cleanup,
+};
+
 static UCS_CLASS_INIT_FUNC(uct_cuda_copy_iface_t, uct_md_h md, uct_worker_h worker,
-                           const uct_iface_params_t *params,
+        const uct_iface_params_t *params,
                            const uct_iface_config_t *tl_config)
 {
+    ucs_status_t status;
     UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_cuda_copy_iface_ops, md, worker,
                               params, tl_config UCS_STATS_ARG(params->stats_root)
-                              UCS_STATS_ARG(UCT_CUDA_TL_NAME));
+                              UCS_STATS_ARG(UCT_CUDA_COPY_TL_NAME));
 
     if (strcmp(params->dev_name, UCT_CUDA_DEV_NAME) != 0) {
         ucs_error("No device was found: %s", params->dev_name);
         return UCS_ERR_NO_DEVICE;
+    }
+
+
+    status = ucs_mpool_init(&self->cuda_event_desc,
+            0,
+            sizeof(uct_cuda_copy_event_desc_t),
+            0,                            /* alignment offset */
+            UCS_SYS_CACHE_LINE_SIZE,      /* alignment */
+            128,                          /* grow */
+            1024,                         /* max desc */
+            &uct_cuda_copy_event_desc_mpool_ops,
+            "CUDA EVENT objects");
+
+    if (UCS_OK != status) {
+        ucs_error("Mpool creation failed");
+        return UCS_ERR_IO_ERROR;
+    }
+
+    status = CUDA_FUNC(cudaStreamCreateWithFlags(&self->stream_d2h, cudaStreamNonBlocking));
+    if (UCS_OK != status) {
+        ucs_error("cudaStreamCreateWithFlags creation failed");
+        return UCS_ERR_IO_ERROR;
+    }
+    status = CUDA_FUNC(cudaStreamCreateWithFlags(&self->stream_h2d, cudaStreamNonBlocking));
+    if (UCS_OK != status) {
+        ucs_error("cudaStreamCreateWithFlags creation failed");
+        return UCS_ERR_IO_ERROR;
     }
 
     return UCS_OK;
@@ -121,7 +197,7 @@ static UCS_CLASS_INIT_FUNC(uct_cuda_copy_iface_t, uct_md_h md, uct_worker_h work
 
 static UCS_CLASS_CLEANUP_FUNC(uct_cuda_copy_iface_t)
 {
-    /* tasks to tear down the domain */
+    ucs_mpool_cleanup(&self->cuda_event_desc, 1);
 }
 
 UCS_CLASS_DEFINE(uct_cuda_copy_iface_t, uct_base_iface_t);
@@ -143,7 +219,7 @@ static ucs_status_t uct_cuda_copy_query_tl_resources(uct_md_h md,
     }
 
     ucs_snprintf_zero(resource->tl_name, sizeof(resource->tl_name), "%s",
-                      UCT_CUDA_TL_NAME);
+                      UCT_CUDA_COPY_TL_NAME);
     ucs_snprintf_zero(resource->dev_name, sizeof(resource->dev_name), "%s",
                       UCT_CUDA_DEV_NAME);
     resource->dev_type = UCT_DEVICE_TYPE_ACC;
@@ -156,8 +232,8 @@ static ucs_status_t uct_cuda_copy_query_tl_resources(uct_md_h md,
 UCT_TL_COMPONENT_DEFINE(uct_cuda_copy_tl,
                         uct_cuda_copy_query_tl_resources,
                         uct_cuda_copy_iface_t,
-                        UCT_CUDA_TL_NAME,
-                        "CUDA_",
+                        UCT_CUDA_COPY_TL_NAME,
+                        "CUDA_COPY_",
                         uct_cuda_copy_iface_config_table,
                         uct_cuda_copy_iface_config_t);
-UCT_MD_REGISTER_TL(&uct_cuda_copy_md, &uct_cuda_copy_tl);
+UCT_MD_REGISTER_TL(&uct_cuda_copy_md_component, &uct_cuda_copy_tl);

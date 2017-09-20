@@ -4,8 +4,8 @@
  * See file LICENSE for terms.
  */
 
-#ifndef UCT_CUDA_CONTEXT_H
-#define UCT_CUDA_CONTEXT_H
+#ifndef UCT_GDR_COPY_MD_H
+#define UCT_GDR_COPY_MD_H
 
 #include <uct/base/uct_md.h>
 #include <ucs/sys/rcache.h>
