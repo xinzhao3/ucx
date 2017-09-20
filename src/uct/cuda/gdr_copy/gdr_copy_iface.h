@@ -10,7 +10,7 @@
 #include <uct/base/uct_iface.h>
 
 
-#define UCT_CUDA_TL_NAME    "gdr_copy"
+#define UCT_GDR_COPY_TL_NAME    "gdr_copy"
 #define UCT_CUDA_DEV_NAME   "gpu0"
 
 

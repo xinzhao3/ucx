@@ -16,6 +16,13 @@
 #include <cuda.h>
 
 
+static ucs_config_field_t uct_cuda_copy_md_config_table[] = {
+    {"", "", NULL,
+        ucs_offsetof(uct_cuda_copy_md_config_t, super), UCS_CONFIG_TYPE_TABLE(uct_md_config_table)},
+
+    {NULL}
+};
+
 static ucs_status_t uct_cuda_copy_md_query(uct_md_h md, uct_md_attr_t *md_attr)
 {
     md_attr->cap.flags         = UCT_MD_FLAG_REG | UCT_MD_FLAG_ADDR_DN;
@@ -115,31 +122,45 @@ static ucs_status_t uct_cuda_copy_mem_detect(uct_md_h md, void *addr)
 static ucs_status_t uct_cuda_copy_query_md_resources(uct_md_resource_desc_t **resources_p,
                                                 unsigned *num_resources_p)
 {
-    return uct_single_md_resource(&uct_cuda_copy_md, resources_p, num_resources_p);
+    return uct_single_md_resource(&uct_cuda_copy_md_component, resources_p, num_resources_p);
 }
 
-static ucs_status_t uct_cuda_copy_md_open(const char *md_name, const uct_md_config_t *md_config,
+static void uct_cuda_copy_md_close(uct_md_h uct_md) {
+    uct_cuda_copy_md_t *md = ucs_derived_of(uct_md, uct_cuda_copy_md_t);
+    ucs_free(md);
+
+}
+static uct_md_ops_t md_ops = {
+    .close        = uct_cuda_copy_md_close,
+    .query        = uct_cuda_copy_md_query,
+    .mkey_pack    = uct_cuda_copy_mkey_pack,
+    .mem_reg      = uct_cuda_copy_mem_reg,
+    .mem_dereg    = uct_cuda_copy_mem_dereg,
+    .mem_detect   = uct_cuda_copy_mem_detect
+};
+
+static ucs_status_t uct_cuda_copy_md_open(const char *md_name, const uct_md_config_t *uct_md_config,
                                      uct_md_h *md_p)
 {
-    static uct_md_ops_t md_ops = {
-        .close        = (void*)ucs_empty_function,
-        .query        = uct_cuda_copy_md_query,
-        .mkey_pack    = uct_cuda_copy_mkey_pack,
-        .mem_reg      = uct_cuda_copy_mem_reg,
-        .mem_dereg    = uct_cuda_copy_mem_dereg,
-        .mem_detect   = uct_cuda_copy_mem_detect
-    };
-    static uct_md_t md = {
-        .ops          = &md_ops,
-        .component    = &uct_cuda_copy_md
-    };
+    uct_cuda_copy_md_t *md;
+  //  ucs_status_t status;
+  //  const uct_cuda_copy_md_config_t *md_config = ucs_derived_of(uct_md_config, uct_cuda_copy_md_config_t);
 
-    *md_p = &md;
+    md = ucs_malloc(sizeof(uct_cuda_copy_md_t), "uct_cuda_copy_md_t");
+    if (NULL == md) {
+        ucs_error("Failed to allocate memory for uct_cuda_copy_md_t");
+        return UCS_ERR_NO_MEMORY;
+    }
+
+    md->super.ops = &md_ops;
+    md->super.component = &uct_cuda_copy_md_component;
+
+    *md_p = (uct_md_h) md;
     return UCS_OK;
 }
 
-UCT_MD_COMPONENT_DEFINE(uct_cuda_copy_md, UCT_CUDA_MD_NAME,
+UCT_MD_COMPONENT_DEFINE(uct_cuda_copy_md_component, UCT_CUDA_COPY_MD_NAME,
                         uct_cuda_copy_query_md_resources, uct_cuda_copy_md_open, NULL,
-                        uct_cuda_copy_rkey_unpack, uct_cuda_copy_rkey_release, "CUDA_",
-                        uct_md_config_table, uct_md_config_t);
+                        uct_cuda_copy_rkey_unpack, uct_cuda_copy_rkey_release, "CUDA_COPY_",
+                        uct_cuda_copy_md_config_table, uct_cuda_copy_md_config_t);
 

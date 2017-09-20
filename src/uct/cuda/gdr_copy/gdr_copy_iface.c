@@ -108,7 +108,7 @@ static UCS_CLASS_INIT_FUNC(uct_gdr_copy_iface_t, uct_md_h md, uct_worker_h worke
 {
     UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_gdr_copy_iface_ops, md, worker,
                               params, tl_config UCS_STATS_ARG(params->stats_root)
-                              UCS_STATS_ARG(UCT_CUDA_TL_NAME));
+                              UCS_STATS_ARG(UCT_GDR_COPY_TL_NAME));
 
     if (strcmp(params->dev_name, UCT_CUDA_DEV_NAME) != 0) {
         ucs_error("No device was found: %s", params->dev_name);
@@ -142,7 +142,7 @@ static ucs_status_t uct_gdr_copy_query_tl_resources(uct_md_h md,
     }
 
     ucs_snprintf_zero(resource->tl_name, sizeof(resource->tl_name), "%s",
-                      UCT_CUDA_TL_NAME);
+                      UCT_GDR_COPY_TL_NAME);
     ucs_snprintf_zero(resource->dev_name, sizeof(resource->dev_name), "%s",
                       UCT_CUDA_DEV_NAME);
     resource->dev_type = UCT_DEVICE_TYPE_ACC;
@@ -155,8 +155,8 @@ static ucs_status_t uct_gdr_copy_query_tl_resources(uct_md_h md,
 UCT_TL_COMPONENT_DEFINE(uct_gdr_copy_tl,
                         uct_gdr_copy_query_tl_resources,
                         uct_gdr_copy_iface_t,
-                        UCT_CUDA_TL_NAME,
-                        "CUDA_",
+                        UCT_GDR_COPY_TL_NAME,
+                        "GDR_COPY_",
                         uct_gdr_copy_iface_config_table,
                         uct_gdr_copy_iface_config_t);
 UCT_MD_REGISTER_TL(&uct_gdr_copy_md_component, &uct_gdr_copy_tl);
