@@ -150,6 +150,10 @@ static ucs_config_field_t ucp_config_table[] = {
    "Also the value has to be bigger than UCX_TM_THRESH to take an effect." ,
    ucs_offsetof(ucp_config_t, ctx.tm_max_bcopy), UCS_CONFIG_TYPE_MEMUNITS},
 
+  {"RNDV_FRAG_SIZE", "65536",
+   "RNDV fragment size \n",
+   ucs_offsetof(ucp_config_t, ctx.rndv_frag_size), UCS_CONFIG_TYPE_MEMUNITS},
+
   {NULL}
 };
 

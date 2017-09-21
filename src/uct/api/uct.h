@@ -327,8 +327,9 @@ enum {
     UCT_MD_FLAG_RKEY_PTR   = UCS_BIT(6),   /**< MD supports direct access to
                                                remote memory via a pointer that
                                                is returned by @ref uct_rkey_ptr */
-    UCT_MD_FLAG_ADDR_DN    = UCS_BIT(7)   /**< MD supports memory addr domain 
+    UCT_MD_FLAG_ADDR_DN    = UCS_BIT(7),  /**< MD supports memory addr domain 
                                                detection */
+    UCT_MD_FLAG_RNDV_REG   = UCS_BIT(8)
                                         
 };
 
