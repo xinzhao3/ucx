@@ -61,9 +61,11 @@ typedef struct {
 #define UCP_ADDRESS_FLAG_EMPTY        0x80   /* Device without TL addresses */
 #define UCP_ADDRESS_FLAG_MD_ALLOC     0x40   /* MD can register  */
 #define UCP_ADDRESS_FLAG_MD_REG       0x20   /* MD can allocate */
+#define UCP_ADDRESS_FLAG_MD_DOMAIN    0x10   /* address domain MD */
 #define UCP_ADDRESS_FLAG_MD_MASK      ~(UCP_ADDRESS_FLAG_EMPTY | \
                                         UCP_ADDRESS_FLAG_MD_ALLOC | \
-                                        UCP_ADDRESS_FLAG_MD_REG)
+                                        UCP_ADDRESS_FLAG_MD_REG | \
+                                        UCP_ADDRESS_FLAG_MD_DOMAIN)
 
 static size_t ucp_address_string_packed_size(const char *s)
 {
@@ -325,7 +327,8 @@ static ucs_status_t ucp_address_do_pack(ucp_worker_h worker, ucp_ep_h ep,
         *(uint8_t*)ptr = md_index |
                          ((dev->tl_bitmap == 0)          ? UCP_ADDRESS_FLAG_EMPTY    : 0) |
                          ((md_flags & UCT_MD_FLAG_ALLOC) ? UCP_ADDRESS_FLAG_MD_ALLOC : 0) |
-                         ((md_flags & UCT_MD_FLAG_REG)   ? UCP_ADDRESS_FLAG_MD_REG   : 0);
+                         ((md_flags & UCT_MD_FLAG_REG)   ? UCP_ADDRESS_FLAG_MD_REG   : 0) |
+                         ((md_flags & UCT_MD_FLAG_ADDR_DN)  ? UCP_ADDRESS_FLAG_MD_DOMAIN : 0);
         ++ptr;
 
         /* Device address length */
@@ -564,6 +567,7 @@ ucs_status_t ucp_address_unpack(const void *buffer, uint64_t *remote_uuid_p,
         md_index     = md_byte & UCP_ADDRESS_FLAG_MD_MASK;
         md_flags     = (md_byte & UCP_ADDRESS_FLAG_MD_ALLOC) ? UCT_MD_FLAG_ALLOC : 0;
         md_flags    |= (md_byte & UCP_ADDRESS_FLAG_MD_REG)   ? UCT_MD_FLAG_REG   : 0;
+        md_flags    |= (md_byte & UCP_ADDRESS_FLAG_MD_DOMAIN)   ? UCT_MD_FLAG_ADDR_DN  : 0;
         empty_dev    = md_byte & UCP_ADDRESS_FLAG_EMPTY;
         ++ptr;
 

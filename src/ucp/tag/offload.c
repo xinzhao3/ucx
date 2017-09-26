@@ -64,7 +64,7 @@ void ucp_tag_offload_completed(uct_tag_context_t *self, uct_tag_t stag,
     }
 
     if (req->recv.rdesc != NULL) {
-        status = ucp_dt_unpack(req->recv.datatype, req->recv.buffer, req->recv.length,
+        status = ucp_dt_unpack(req, req->recv.datatype, req->recv.buffer, req->recv.length,
                                &req->recv.state, req->recv.rdesc + 1, length, 1);
         ucs_mpool_put_inline(req->recv.rdesc);
     } else {

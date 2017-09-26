@@ -101,7 +101,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_eager_unexp_match(ucp_worker_h worker, ucp_recv_desc_t *rdesc, ucp_tag_t tag,
                       unsigned flags, void *buffer, size_t count,
                       ucp_datatype_t datatype, ucp_dt_state_t *state,
-                      ucp_tag_recv_info_t *info)
+                      ucp_request_t *req, ucp_tag_recv_info_t *info)
 {
     size_t recv_len, hdr_len;
     ucs_status_t status;
@@ -110,7 +110,7 @@ ucp_eager_unexp_match(ucp_worker_h worker, ucp_recv_desc_t *rdesc, ucp_tag_t tag
     UCP_WORKER_STAT_EAGER_CHUNK(worker, UNEXP);
     hdr_len  = rdesc->hdr_len;
     recv_len = rdesc->length - hdr_len;
-    status   = ucp_dt_unpack(datatype, buffer, count, state, data + hdr_len,
+    status   = ucp_dt_unpack(req, datatype, buffer, count, state, data + hdr_len,
                              recv_len, flags & UCP_RECV_DESC_FLAG_LAST);
     state->offset += recv_len;
 

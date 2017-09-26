@@ -10,17 +10,19 @@
 #include <ucs/algorithm/qsort_r.h>
 #include <ucs/datastruct/queue.h>
 #include <ucp/core/ucp_ep.inl>
+#include <ucp/core/ucp_mm.h>
 #include <string.h>
 #include <inttypes.h>
 
 #define UCP_WIREUP_RNDV_TEST_MSG_SIZE       262144
 
 enum {
-    UCP_WIREUP_LANE_USAGE_AM   = UCS_BIT(0),
-    UCP_WIREUP_LANE_USAGE_RMA  = UCS_BIT(1),
-    UCP_WIREUP_LANE_USAGE_AMO  = UCS_BIT(2),
-    UCP_WIREUP_LANE_USAGE_RNDV = UCS_BIT(3),
-    UCP_WIREUP_LANE_USAGE_TAG  = UCS_BIT(4)
+    UCP_WIREUP_LANE_USAGE_AM      = UCS_BIT(0),
+    UCP_WIREUP_LANE_USAGE_RMA     = UCS_BIT(1),
+    UCP_WIREUP_LANE_USAGE_AMO     = UCS_BIT(2),
+    UCP_WIREUP_LANE_USAGE_RNDV    = UCS_BIT(3),
+    UCP_WIREUP_LANE_USAGE_TAG     = UCS_BIT(4),
+    UCP_WIREUP_LANE_USAGE_DOMAIN  = UCS_BIT(5)
 };
 
 
@@ -32,10 +34,12 @@ typedef struct {
     uint32_t          usage;
     double            rma_score;
     double            amo_score;
+    double            domain_score;
 } ucp_wireup_lane_desc_t;
 
 
 static const char *ucp_wireup_md_flags[] = {
+    [ucs_ilog2(UCT_MD_FLAG_ADDR_DN)]             = "memory address domain",
     [ucs_ilog2(UCT_MD_FLAG_ALLOC)]               = "memory allocation",
     [ucs_ilog2(UCT_MD_FLAG_REG)]                 = "memory registration",
 };
@@ -361,6 +365,7 @@ out_add_lane:
     lane_desc->usage        = usage;
     lane_desc->rma_score    = 0.0;
     lane_desc->amo_score    = 0.0;
+    lane_desc->domain_score = 0.0;
 
 out_update_score:
     if (usage & UCP_WIREUP_LANE_USAGE_RMA) {
@@ -368,6 +373,9 @@ out_update_score:
     }
     if (usage & UCP_WIREUP_LANE_USAGE_AMO) {
         lane_desc->amo_score = score;
+    }
+    if (usage & UCP_WIREUP_LANE_USAGE_DOMAIN) {
+        lane_desc->domain_score = score;
     }
 }
 
@@ -391,6 +399,12 @@ static int ucp_wireup_compare_lane_rma_score(const void *elem1, const void *elem
 }
 
 static int ucp_wireup_compare_lane_amo_score(const void *elem1, const void *elem2,
+                                             void *arg)
+{
+    return UCP_WIREUP_COMPARE_SCORE(elem1, elem2, arg, amo);
+}
+
+static int ucp_wireup_compare_lane_domain_score(const void *elem1, const void *elem2,
                                              void *arg)
 {
     return UCP_WIREUP_COMPARE_SCORE(elem1, elem2, arg, amo);
@@ -546,6 +560,163 @@ static ucs_status_t ucp_wireup_add_rma_lanes(ucp_ep_h ep, const ucp_ep_params_t 
     return ucp_wireup_add_memaccess_lanes(ep, address_count, address_list,
                                           lane_descs, num_lanes_p, &criteria,
                                           -1, UCP_WIREUP_LANE_USAGE_RMA);
+}
+
+ucp_lane_index_t ucp_config_find_domain_lane(const ucp_ep_config_t *config,
+                                                 const ucp_lane_index_t *lanes,
+                                                 ucp_md_map_t dn_md_map)
+{
+    ucp_md_index_t dst_md_index;
+    ucp_lane_index_t lane;
+    ucp_md_map_t dst_md_mask;
+    int prio;
+
+    for (prio = 0; prio < UCP_MAX_LANES; ++prio) {
+        lane = lanes[prio];
+        if (lane == UCP_NULL_LANE) {
+            return UCP_NULL_LANE; /* No more lanes */
+        }
+
+        dst_md_index = config->key.lanes[lane].dst_md_index;
+        dst_md_mask  = UCS_BIT(dst_md_index);
+        if (dn_md_map & dst_md_mask) {
+            return lane;
+        }
+    }
+    return UCP_NULL_LANE;
+}
+
+ucs_status_t ucp_ep_set_domain_lanes(ucp_ep_h ep, ucp_addr_dn_h addr_dn_h)
+{
+    ucp_rsc_index_t rsc_index;
+    uct_iface_attr_t *iface_attr;
+    ucp_md_map_t dn_md_map;
+    ucp_lane_index_t dn_lane;
+    ucp_md_index_t md_index;
+
+    dn_md_map = addr_dn_h->md_map;
+
+        while(1) {
+            dn_lane = ucp_config_find_domain_lane(ucp_ep_config(ep),
+                    ucp_ep_config(ep)->key.domain_lanes, dn_md_map);
+            if (dn_lane == UCP_NULL_LANE) {
+                ucs_error("Not find address domain lane.");
+                return UCS_ERR_IO_ERROR;
+            }
+            rsc_index    = ucp_ep_get_rsc_index(ep, dn_lane);
+            iface_attr = &ep->worker->ifaces[rsc_index].attr;
+            md_index = ucp_ep_config(ep)->key.lanes[dn_lane].dst_md_index;
+            if (iface_attr->cap.flags & UCT_IFACE_FLAG_PUT_ZCOPY) {
+                addr_dn_h->eager_lane = dn_lane;
+            }
+            /*TODO: revisit cap flags for rndv lane*/
+            /*if (iface_attr->cap.flags & UCT_IFACE_FLAG_GET_ZCOPY) {
+                *addr_dn_h->rndv_lane = dn_lane
+            }*/
+            dn_md_map |= ~UCS_BIT(md_index);
+            if (addr_dn_h->eager_lane != UCP_NULL_LANE || dn_md_map == 0) {
+                break;
+            }
+        }
+
+    return UCS_OK;
+}
+
+
+double ucp_wireup_addr_domain_score_func(ucp_context_h context,
+                                 const uct_md_attr_t *md_attr,
+                                 const uct_iface_attr_t *iface_attr,
+                                 const ucp_address_iface_attr_t *remote_iface_attr)
+{
+    /* best end-to-end latency and larger bcopy size */
+    return (1e-3 / (ucp_wireup_tl_iface_latency(context, iface_attr, remote_iface_attr) +
+            iface_attr->overhead + remote_iface_attr->overhead));
+}
+
+static UCS_F_NOINLINE ucs_status_t
+ucp_wireup_add_addr_domain_lanes(ucp_ep_h ep, unsigned address_count,
+                               const ucp_address_entry_t *address_list,
+                               ucp_wireup_lane_desc_t *lane_descs,
+                               ucp_lane_index_t *num_lanes_p,
+                               const ucp_wireup_criteria_t *criteria,
+                               uint64_t tl_bitmap, uint32_t usage)
+{
+    ucp_address_entry_t *address_list_copy;
+    ucp_rsc_index_t rsc_index, dst_md_index;
+    size_t address_list_size;
+    double score;
+    uint64_t remote_md_map;
+    unsigned addr_index;
+    ucs_status_t status;
+
+    remote_md_map = -1;
+
+    /* Create a copy of the address list */
+    address_list_size = sizeof(*address_list_copy) * address_count;
+    address_list_copy = ucs_malloc(address_list_size, "rma address list");
+    if (address_list_copy == NULL) {
+        status = UCS_ERR_NO_MEMORY;
+        goto out;
+    }
+
+    memcpy(address_list_copy, address_list, address_list_size);
+
+    status = ucp_wireup_select_transport(ep, address_list_copy, address_count,
+                                         criteria, tl_bitmap, remote_md_map,
+                                         0, &rsc_index, &addr_index, &score);
+    if (status != UCS_OK) {
+        goto out_free_address_list;
+    }
+
+    dst_md_index = address_list_copy[addr_index].md_index;
+
+    /* Add to the list of lanes and remove all occurrences of the remote md
+     * from the address list, to avoid selecting the same remote md again.*/
+    ucp_wireup_add_lane_desc(lane_descs, num_lanes_p, rsc_index, addr_index,
+                             dst_md_index, score, usage, 0);
+    remote_md_map &= ~UCS_BIT(dst_md_index);
+
+    while (address_count > 0) {
+        status = ucp_wireup_select_transport(ep, address_list_copy, address_count,
+                                             criteria, tl_bitmap, remote_md_map,
+                                             0, &rsc_index, &addr_index, &score);
+        if (status != UCS_OK) {
+            break;
+        }
+
+        /* Add lane description and remove all occurrences of the remote md */
+        dst_md_index = address_list_copy[addr_index].md_index;
+        ucp_wireup_add_lane_desc(lane_descs, num_lanes_p, rsc_index, addr_index,
+                                 dst_md_index, score, usage, 0);
+        remote_md_map &= ~UCS_BIT(dst_md_index);
+    }
+
+    status = UCS_OK;
+
+out_free_address_list:
+    ucs_free(address_list_copy);
+out:
+    return UCS_OK;
+}
+static ucs_status_t ucp_wireup_add_domain_lane(ucp_ep_h ep, const ucp_ep_params_t *params,
+                                             unsigned address_count,
+                                             const ucp_address_entry_t *address_list,
+                                             ucp_wireup_lane_desc_t *lane_descs,
+                                             ucp_lane_index_t *num_lanes_p)
+{
+    ucp_wireup_criteria_t criteria;
+
+    criteria.title              = "adress domain";
+    criteria.local_md_flags     = UCT_MD_FLAG_ADDR_DN;
+    criteria.remote_md_flags    = UCT_MD_FLAG_ADDR_DN;
+    criteria.remote_iface_flags = UCT_IFACE_FLAG_CONNECT_TO_IFACE;
+    criteria.local_iface_flags  = criteria.remote_iface_flags;
+    criteria.calc_score         = ucp_wireup_addr_domain_score_func;
+    ucp_wireup_fill_ep_params_criteria(&criteria, params);
+
+    return ucp_wireup_add_addr_domain_lanes(ep, address_count, address_list,
+                                          lane_descs, num_lanes_p, &criteria,
+                                          -1, UCP_WIREUP_LANE_USAGE_DOMAIN);
 }
 
 double ucp_wireup_amo_score_func(ucp_context_h context,
@@ -899,6 +1070,12 @@ ucs_status_t ucp_wireup_select_lanes(ucp_ep_h ep, const ucp_ep_params_t *params,
         return status;
     }
 
+    status = ucp_wireup_add_domain_lane(ep, params, address_count, address_list,
+                                     lane_descs, &key->num_lanes);
+    if (status != UCS_OK) {
+        return status;
+    }
+
     /* User should not create endpoints unless requested communication features */
     if (key->num_lanes == 0) {
         ucs_error("No transports selected to %s (features: 0x%lx)",
@@ -936,6 +1113,9 @@ ucs_status_t ucp_wireup_select_lanes(ucp_ep_h ep, const ucp_ep_params_t *params,
             ucs_assert(key->tag_lane == UCP_NULL_LANE);
             key->tag_lane = lane;
         }
+        if (lane_descs[lane].usage & UCP_WIREUP_LANE_USAGE_DOMAIN) {
+            key->domain_lanes[lane] = lane;
+        }
     }
 
     /* Sort RMA and AMO lanes according to score */
@@ -943,6 +1123,9 @@ ucs_status_t ucp_wireup_select_lanes(ucp_ep_h ep, const ucp_ep_params_t *params,
                 ucp_wireup_compare_lane_rma_score, lane_descs);
     ucs_qsort_r(key->amo_lanes, UCP_MAX_LANES, sizeof(ucp_lane_index_t),
                 ucp_wireup_compare_lane_amo_score, lane_descs);
+    ucs_qsort_r(key->domain_lanes, UCP_MAX_LANES, sizeof(ucp_lane_index_t),
+                ucp_wireup_compare_lane_domain_score, lane_descs);
+
 
     /* Get all reachable MDs from full remote address list */
     key->reachable_md_map = ucp_wireup_get_reachable_mds(worker, address_count,

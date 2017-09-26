@@ -202,7 +202,8 @@ ucp_tag_send_req(ucp_request_t *req, size_t count, ssize_t max_short,
 
 static void ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep,
                                   const void* buffer, uintptr_t datatype,
-                                  ucp_tag_t tag, uint16_t flags)
+                                  ucp_tag_t tag, uint16_t flags,
+                                  ucp_addr_dn_h addr_dn_h)
 {
     req->flags             = flags;
     req->send.ep           = ep;
@@ -211,6 +212,7 @@ static void ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep,
     req->send.tag          = tag;
     req->send.reg_rsc      = UCP_NULL_RESOURCE;
     req->send.state.offset = 0;
+    req->addr_dn_h           = addr_dn_h;
     VALGRIND_MAKE_MEM_UNDEFINED(&req->send.uct_comp.count,
                                 sizeof(req->send.uct_comp.count));
 
@@ -228,13 +230,20 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
     ucp_request_t *req;
     size_t length;
     ucs_status_ptr_t ret;
+    ucp_addr_dn_h addr_dn_h;
 
     UCP_THREAD_CS_ENTER_CONDITIONAL(&ep->worker->mt_lock);
 
     ucs_trace_req("send_nb buffer %p count %zu tag %"PRIx64" to %s cb %p",
                   buffer, count, tag, ucp_ep_peer_name(ep), cb);
 
-    if (ucs_likely(UCP_DT_IS_CONTIG(datatype))) {
+    ucp_addr_domain_detect_mds(ep->worker->context, (void *)buffer, &addr_dn_h);
+    if (ucs_likely(!UCP_IS_DEFAULT_ADDR_DOMAIN(addr_dn_h))) {
+        ucp_ep_set_domain_lanes(ep, addr_dn_h);
+    }
+
+    if (ucs_likely(UCP_IS_DEFAULT_ADDR_DOMAIN(addr_dn_h)) &&
+                        ucs_likely(UCP_DT_IS_CONTIG(datatype))) {
         length = ucp_contig_dt_length(datatype, count);
         if (ucs_likely((ssize_t)length <= ucp_ep_config(ep)->tag.eager.max_short)) {
             status = UCS_PROFILE_CALL(ucp_tag_send_eager_short, ep, tag, buffer,
@@ -253,11 +262,15 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
         goto out;
     }
 
-    ucp_tag_send_req_init(req, ep, buffer, datatype, tag, 0);
+    ucp_tag_send_req_init(req, ep, buffer, datatype, tag, 0, addr_dn_h);
 
     ret = ucp_tag_send_req(req, count,
-                           ucp_ep_config(ep)->tag.eager.max_short,
-                           ucp_ep_config(ep)->tag.eager.zcopy_thresh,
+                           ucs_likely(UCP_IS_DEFAULT_ADDR_DOMAIN(addr_dn_h)) ?
+                                    ucp_ep_config(ep)->tag.eager.max_short :
+                                    ucp_ep_config(ep)->domain[addr_dn_h->eager_lane].tag.eager.max_short,
+                           ucs_likely(UCP_IS_DEFAULT_ADDR_DOMAIN(addr_dn_h)) ?
+                                    ucp_ep_config(ep)->tag.eager.zcopy_thresh :
+                                    ucp_ep_config(ep)->domain[addr_dn_h->eager_lane].tag.eager.zcopy_thresh,
                            ucp_ep_config(ep)->tag.rndv.rma_thresh,
                            ucp_ep_config(ep)->tag.rndv.am_thresh,
                            cb, ucp_ep_config(ep)->tag.proto);
@@ -293,7 +306,9 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
     /* Remote side needs to send reply, so have it connect to us */
     ucp_ep_connect_remote(ep);
 
-    ucp_tag_send_req_init(req, ep, buffer, datatype, tag, UCP_REQUEST_FLAG_SYNC);
+
+    ucp_tag_send_req_init(req, ep, buffer, datatype, tag, UCP_REQUEST_FLAG_SYNC,
+                          &ucp_addr_dn_dummy_handle);
 
     ret = ucp_tag_send_req(req, count,
                            -1, /* disable short method */

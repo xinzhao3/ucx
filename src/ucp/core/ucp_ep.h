@@ -81,6 +81,9 @@ typedef struct ucp_ep_config_key {
     /* Lanes for atomic operations, sorted by priority, highest first */
     ucp_lane_index_t       amo_lanes[UCP_MAX_LANES];
 
+    /* Lanes for domain operations, sorted by priority, highest first */
+    ucp_lane_index_t       domain_lanes[UCP_MAX_LANES];
+
     /* Bitmap of remote mds which are reachable from this endpoint (with any set
      * of transports which could be selected in the future).
      */
@@ -105,6 +108,17 @@ typedef struct ucp_ep_rma_config {
     size_t                 get_zcopy_thresh;
 } ucp_ep_rma_config_t;
 
+
+#define UCP_IS_DEFAULT_ADDR_DOMAIN(_addr_dn_h) (_addr_dn_h == &ucp_addr_dn_dummy_handle)
+
+typedef struct ucp_ep_addr_domain_config {
+    struct {
+        struct {
+            ssize_t        max_short;
+            size_t         zcopy_thresh[UCP_MAX_IOV];
+        } eager;
+    } tag;
+} ucp_ep_addr_domain_config_t;
 
 /*
  * Configuration for AM and tag offload protocols
@@ -135,6 +149,10 @@ typedef struct ucp_ep_config {
      * establishment protocols.
      */
     ucp_lane_map_t          p2p_lanes;
+
+    /* Bitmap of which lanes are domain lanes
+     */
+    ucp_lane_map_t          domain_lanes;
 
     /* Configuration for each lane that provides RMA */
     ucp_ep_rma_config_t     rma[UCP_MAX_LANES];
@@ -179,8 +197,11 @@ typedef struct ucp_ep_config {
          * (currently it's only AM based). */
         const ucp_proto_t   *proto;
     } stream;
-} ucp_ep_config_t;
 
+    /* Configuration of all domains */
+    ucp_ep_addr_domain_config_t domain[UCP_MAX_LANES];
+
+} ucp_ep_config_t;
 
 /**
  * Remote protocol layer endpoint
@@ -245,4 +266,8 @@ size_t ucp_ep_config_get_zcopy_auto_thresh(size_t iovcnt,
                                            const ucp_context_h context,
                                            double bandwidth);
 
+ucp_lane_index_t ucp_config_find_domain_lane(const ucp_ep_config_t *config,
+                                                 const ucp_lane_index_t *lanes,
+                                                 ucp_md_map_t dn_md_map);
+ucs_status_t ucp_ep_set_domain_lanes(ucp_ep_h ep, ucp_addr_dn_h addr_dn_h);
 #endif
