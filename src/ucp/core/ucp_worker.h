@@ -147,6 +147,7 @@ typedef struct ucp_worker {
     ucs_mpool_t                   am_mp;         /* Memory pool for AM receives */
     ucs_mpool_t                   reg_mp;        /* Registered memory pool */
     ucp_mt_lock_t                 mt_lock;       /* Configuration of multi-threading support */
+    ucs_mpool_t                   rndv_frag_mp;  /* Memory pool for RNDV fragments */
 
     UCS_STATS_NODE_DECLARE(stats);
 
