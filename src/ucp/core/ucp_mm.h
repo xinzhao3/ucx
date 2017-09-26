@@ -71,6 +71,7 @@ typedef struct ucp_mem_desc {
 typedef struct ucp_mem_type {
     ucp_md_map_t        md_map;       /* Which MDs have own ths addr Domain */
     uct_memory_type_t   id;           /* memory type */
+    ucp_lane_index_t    eager_lane;
 } ucp_mem_type_t;
 
 void ucp_rkey_resolve_inner(ucp_rkey_h rkey, ucp_ep_h ep);

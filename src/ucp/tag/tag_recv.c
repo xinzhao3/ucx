@@ -85,7 +85,7 @@ ucp_tag_search_unexp(ucp_worker_h worker, void *buffer, size_t buffer_size,
                 UCS_PROFILE_REQUEST_EVENT(req, "eager_match", 0);
                 status = ucp_eager_unexp_match(worker, rdesc, recv_tag, flags,
                                                buffer, buffer_size, datatype,
-                                               &req->recv.state, info);
+                                               &req->recv.state, req, info);
                 ucs_trace_req("release receive descriptor %p", rdesc);
                 if (status != UCS_INPROGRESS) {
                     goto out_release_desc;
@@ -127,6 +127,8 @@ ucp_tag_recv_request_init(ucp_request_t *req, ucp_worker_h worker, void* buffer,
     req->flags = UCP_REQUEST_FLAG_EXPECTED | UCP_REQUEST_FLAG_RECV | req_flags;
     req->recv.state.offset = 0;
     req->recv.worker       = worker;
+
+    ucp_addr_domain_detect_mds(worker->context, buffer, &req->mem_type);
 
     switch (datatype & UCP_DATATYPE_CLASS_MASK) {
     case UCP_DATATYPE_IOV:
