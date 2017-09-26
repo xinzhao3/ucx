@@ -128,6 +128,8 @@ ucp_tag_recv_request_init(ucp_request_t *req, ucp_worker_h worker, void* buffer,
     req->recv.state.offset = 0;
     req->recv.worker       = worker;
 
+    ucp_addr_domain_detect_mds(worker->context, buffer, &(req->addr_dn_h));
+
     switch (datatype & UCP_DATATYPE_CLASS_MASK) {
     case UCP_DATATYPE_IOV:
         req->recv.state.dt.iov.iov_offset    = 0;

@@ -24,6 +24,12 @@ static ucp_mem_t ucp_mem_dummy_handle = {
     .md_map       = 0
 };
 
+ucp_addr_dn_t ucp_addr_dn_dummy_handle = {
+    .md_map       = 0,
+    .id           = UCT_MD_ADDR_DOMAIN_LAST
+};
+
+
 /**
  * Unregister memory from all memory domains.
  * Save in *alloc_md_memh_p the memory handle of the allocating MD, if such exists.
@@ -106,6 +112,40 @@ static ucs_status_t ucp_memh_reg_mds(ucp_context_h context, ucp_mem_h memh,
     return UCS_OK;
 }
 
+ucs_status_t ucp_addr_domain_detect_mds(ucp_context_h context, void *addr, ucp_addr_dn_h *addr_dn_h)
+{
+    ucs_status_t status;
+    unsigned md_index;
+    uct_addr_domain_t domain_id = UCT_MD_ADDR_DOMAIN_DEFAULT;
+
+    *addr_dn_h = &ucp_addr_dn_dummy_handle;
+
+    /*TODO: return if no MDs with address domain detect */
+
+    for (md_index = 0; md_index < context->num_mds; ++md_index) {
+        if (context->tl_mds[md_index].attr.cap.flags & UCT_MD_FLAG_ADDR_DN) {
+            if (domain_id == UCT_MD_ADDR_DOMAIN_DEFAULT) {
+                status = uct_md_mem_detect(context->tl_mds[md_index].md, addr);
+                if (status == UCS_OK) {
+                    domain_id = context->tl_mds[md_index].attr.cap.addr_dn;
+
+                    *addr_dn_h = ucs_malloc(sizeof(ucp_addr_dn_t), "ucp_addr_dn_h");
+                    if (*addr_dn_h == NULL) {
+                        return UCS_ERR_NO_MEMORY;
+                    }
+
+                    (*addr_dn_h)->id = domain_id;
+                    (*addr_dn_h)->md_map = UCS_BIT(md_index);
+                }
+            } else {
+                if (domain_id == context->tl_mds[md_index].attr.cap.addr_dn) {
+                    (*addr_dn_h)->md_map |= UCS_BIT(md_index);
+                }
+            }
+        }
+    }
+    return UCS_OK;
+}
 /**
  * @return Whether MD number 'md_index' is selected by the configuration as part
  *         of allocation method number 'config_method_index'.

@@ -141,6 +141,13 @@ typedef struct ucp_rkey                  *ucp_rkey_h;
  */
 typedef struct ucp_mem                   *ucp_mem_h;
 
+/*
+ * @ingroup UCP_ADDR_DN
+ * @brief UCP Address Domain
+ *
+ * Address Domain handle is an opaque object representing a memory adreess domain
+*/
+typedef struct ucp_addr_dn              *ucp_addr_dn_h;
 
 /**
  * @ingroup UCP_WORKER
