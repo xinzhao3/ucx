@@ -377,10 +377,23 @@ enum {
     UCT_MD_FLAG_RKEY_PTR   = UCS_BIT(6),  /**< MD supports direct access to
                                                remote memory via a pointer that
                                                is returned by @ref uct_rkey_ptr */
-    UCT_MD_FLAG_SOCKADDR   = UCS_BIT(7)   /**< MD support for client-server
+    UCT_MD_FLAG_SOCKADDR   = UCS_BIT(7),  /**< MD support for client-server
                                                connection establishment via
                                                sockaddr */
+    UCT_MD_FLAG_ADDR_DN    = UCS_BIT(8)   /**< MD supports memory addr domain
+                                               detection */
 };
+
+/*
+ * @ingroup UCT_MD
+ * @brief  Memory addr domains
+ */
+typedef enum {
+    UCT_MD_ADDR_DOMAIN_CUDA = 0,  /**< NVIDIA CUDA domain */
+    UCT_MD_ADDR_DOMAIN_DEFAULT,   /**< Default system domain */
+    UCT_MD_ADDR_DOMAIN_LAST = UCT_MD_ADDR_DOMAIN_DEFAULT
+
+} uct_addr_domain_t;
 
 
 /**
@@ -630,6 +643,7 @@ struct uct_md_attr {
         size_t               max_alloc; /**< Maximal allocation size */
         size_t               max_reg;   /**< Maximal registration size */
         uint64_t             flags;     /**< UCT_MD_FLAG_xx */
+        uct_addr_domain_t    addr_dn;   /**< Supported addr domain */
     } cap;
 
     uct_linear_growth_t      reg_cost;  /**< Memory registration cost estimation
@@ -1412,6 +1426,18 @@ ucs_status_t uct_md_mem_reg(uct_md_h md, void *address, size_t length,
  */
 ucs_status_t uct_md_mem_dereg(uct_md_h md, uct_mem_h memh);
 
+
+/**
+ * @ingroup UCT_MD
+ * @brief Detect memory on the memory domain.
+ *
+ *  Detect memory on the memory domain.
+ *  Return UCS_OK if address belongs to MDs address domain
+ *
+ * @param [in]     md        Memory domain to register memory on.
+ * @param [in]     address   Memory address to detect.
+ */
+ucs_status_t uct_md_mem_detect(uct_md_h md, void *addr);
 
 /**
  * @ingroup UCT_MD

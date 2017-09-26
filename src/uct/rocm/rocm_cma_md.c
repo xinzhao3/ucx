@@ -30,6 +30,7 @@ static ucs_status_t uct_rocm_cma_md_query(uct_md_h md, uct_md_attr_t *md_attr)
     md_attr->rkey_packed_size  = sizeof(uct_rocm_cma_key_t);
     md_attr->cap.flags         = UCT_MD_FLAG_REG |
                                  UCT_MD_FLAG_NEED_RKEY;
+    md_attr->cap.addr_dn       = UCT_MD_ADDR_DOMAIN_DEFAULT;
     md_attr->cap.max_alloc     = 0;
     md_attr->cap.max_reg       = ULONG_MAX;
 
@@ -211,6 +212,7 @@ static ucs_status_t uct_rocm_cma_md_open(const char *md_name,
         .query        = uct_rocm_cma_md_query,
         .mkey_pack    = uct_rocm_cma_rkey_pack,
         .mem_reg      = uct_rocm_cma_mem_reg,
+        .mem_detect   = ucs_empty_function_return_success,
         .mem_dereg    = uct_rocm_cma_mem_dereg
     };
 

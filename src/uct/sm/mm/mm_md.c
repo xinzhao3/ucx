@@ -124,6 +124,7 @@ ucs_status_t uct_mm_md_query(uct_md_h md, uct_md_attr_t *md_attr)
         md_attr->reg_cost.growth   = 0.007e-9;
     }
     md_attr->cap.flags        |= UCT_MD_FLAG_NEED_RKEY;
+    md_attr->cap.addr_dn      = UCT_MD_ADDR_DOMAIN_DEFAULT;
     /* all mm md(s) support fixed memory alloc */
     md_attr->cap.flags        |= UCT_MD_FLAG_FIXED;
     md_attr->cap.max_alloc    = ULONG_MAX;
@@ -227,6 +228,7 @@ uct_md_ops_t uct_mm_md_ops = {
     .mem_free     = uct_mm_mem_free,
     .mem_reg      = uct_mm_mem_reg,
     .mem_dereg    = uct_mm_mem_dereg,
+    .mem_detect   = ucs_empty_function_return_success,
     .mkey_pack    = uct_mm_mkey_pack,
 };
 
