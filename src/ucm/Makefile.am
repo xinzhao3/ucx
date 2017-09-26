@@ -47,6 +47,13 @@ libucm_la_SOURCES = \
 	util/reloc.c \
 	util/sys.c
 
+if HAVE_CUDA
+libucm_la_SOURCES += \
+    cuda/install.c \
+    cuda/replace.c
+
+endif
+
 if HAVE_UCM_PTMALLOC283
 libucm_la_CPPFLAGS += \
     -I$(srcdir)/ptmalloc283/sysdeps/pthread \
