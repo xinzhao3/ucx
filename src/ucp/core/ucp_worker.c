@@ -36,6 +36,88 @@ static ucs_stats_class_t ucp_worker_stats_class = {
 #endif
 
 
+static ucs_status_t ucp_mpool_dereg_mds(ucp_context_h context, ucp_mem_h memh) {
+    unsigned md_index, uct_index;
+    ucs_status_t status;
+
+    uct_index = 0;
+
+    for (md_index = 0; md_index < context->num_mds; ++md_index) {
+        if (!(memh->md_map & UCS_BIT(md_index))) {
+            continue;
+        }
+
+        status = uct_md_mem_dereg(context->tl_mds[md_index].md,
+                                  memh->uct[uct_index]);
+        if (status != UCS_OK) {
+            ucs_error("Failed to dereg address %p with md %s", memh->address,
+                      context->tl_mds[md_index].rsc.md_name);
+            return status;
+        }
+
+        ++uct_index;
+    }
+
+    return UCS_OK;
+}
+
+static ucs_status_t ucp_mpool_reg_mds(ucp_context_h context, ucp_mem_h memh) {
+    unsigned md_index, uct_memh_count;
+    ucs_status_t status;
+
+    uct_memh_count = 0;
+    memh->md_map = 0;
+
+    for (md_index = 0; md_index < context->num_mds; ++md_index) {
+        if (context->tl_mds[md_index].attr.cap.flags & UCT_MD_FLAG_REG) {
+            status = uct_md_mem_reg(context->tl_mds[md_index].md, memh->address,
+                                    memh->length, 0, memh->uct[uct_memh_count]);
+            if (status != UCS_OK) {
+                ucs_error("Failed to register memory pool chunk %p with md %s",
+                          memh->address, context->tl_mds[md_index].rsc.md_name);
+                return status;
+            }
+
+            memh->md_map |= UCS_BIT(md_index);
+            uct_memh_count++;
+        }
+    }
+
+    return UCS_OK;
+}
+
+
+static ucs_status_t ucp_mpool_rndv_malloc(ucs_mpool_t *mp, size_t *size_p, void **chunk_p) {
+    ucp_worker_h worker = ucs_container_of(mp, ucp_worker_t, reg_mp);
+    ucp_mem_desc_t *chunk_hdr;
+    ucs_status_t status;
+
+    status = ucp_mpool_malloc(mp, size_p, chunk_p);
+    if (status != UCS_OK) {
+        ucs_error("Failed to allocate memory pool chunk: %s", ucs_status_string(status));
+        return UCS_ERR_NO_MEMORY;
+    }
+
+    chunk_hdr = (ucp_mem_desc_t *)(*chunk_p) - 1;
+
+    status = ucp_mpool_reg_mds(worker->context, chunk_hdr->memh);
+    if (status != UCS_OK) {
+        ucp_mpool_dereg_mds(worker->context, chunk_hdr->memh);
+        return status;
+    }
+
+    return UCS_OK;
+}
+
+
+static void ucp_mpool_rndv_free(ucs_mpool_t *mp, void *chunk) {
+    ucp_worker_h worker = ucs_container_of(mp, ucp_worker_t, reg_mp);
+    ucp_mem_desc_t *chunk_hdr = (ucp_mem_desc_t *)chunk - 1;
+    ucp_mpool_dereg_mds(worker->context, chunk_hdr->memh);
+    ucp_mpool_free(mp, chunk);
+}
+
+
 ucs_mpool_ops_t ucp_am_mpool_ops = {
     .chunk_alloc   = ucs_mpool_hugetlb_malloc,
     .chunk_release = ucs_mpool_hugetlb_free,
@@ -48,6 +130,14 @@ ucs_mpool_ops_t ucp_reg_mpool_ops = {
     .chunk_alloc   = ucp_mpool_malloc,
     .chunk_release = ucp_mpool_free,
     .obj_init      = ucp_mpool_obj_init,
+    .obj_cleanup   = ucs_empty_function
+};
+
+
+ucs_mpool_ops_t ucp_rndv_frag_mpool_ops = {
+    .chunk_alloc   = ucp_mpool_rndv_malloc,
+    .chunk_release = ucp_mpool_rndv_free,
+    .obj_init      = ucs_empty_function,
     .obj_cleanup   = ucs_empty_function
 };
 
@@ -917,8 +1007,19 @@ static ucs_status_t ucp_worker_init_mpools(ucp_worker_h worker,
         goto err_release_am_mpool;
     }
 
+
+    status = ucs_mpool_init(&worker->rndv_frag_mp, 0,
+                            context->config.ext.rndv_frag_size,
+                            0, 128, 128, UINT_MAX,
+                            &ucp_rndv_frag_mpool_ops, "ucp_rndv_frags");
+    if (status != UCS_OK) {
+        goto err_release_reg_mpool;
+    }
+
     return UCS_OK;
 
+err_release_reg_mpool:
+    ucs_mpool_cleanup(&worker->reg_mp, 0);
 err_release_am_mpool:
     ucs_mpool_cleanup(&worker->am_mp, 0);
 out:
@@ -1140,6 +1241,7 @@ void ucp_worker_destroy(ucp_worker_h worker)
     ucp_worker_destroy_eps(worker);
     ucs_mpool_cleanup(&worker->am_mp, 1);
     ucs_mpool_cleanup(&worker->reg_mp, 1);
+    ucs_mpool_cleanup(&worker->rndv_frag_mp, 1);
     ucp_worker_close_ifaces(worker);
     ucp_worker_wakeup_cleanup(worker);
     ucs_mpool_cleanup(&worker->req_mp, 1);
