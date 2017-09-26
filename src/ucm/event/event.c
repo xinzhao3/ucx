@@ -13,6 +13,9 @@
 #include <ucm/api/ucm.h>
 #include <ucm/mmap/mmap.h>
 #include <ucm/malloc/malloc_hook.h>
+#if HAVE_CUDA
+#include <ucm/cuda/cudamem.h>
+#endif
 #include <ucm/util/ucm_config.h>
 #include <ucm/util/log.h>
 #include <ucm/util/sys.h>
@@ -89,6 +92,13 @@ static void ucm_event_call_orig(ucm_event_type_t event_type, ucm_event_t *event,
             event->sbrk.result = ucm_orig_sbrk(event->sbrk.increment);
         }
         break;
+#if HAVE_CUDA
+    case UCM_EVENT_CUDAFREE:
+        if (event->cudaFree.result == -1) {
+            event->cudaFree.result = ucm_orig_cudaFree(event->cudaFree.address);
+        }
+        break;
+#endif
     default:
         ucm_warn("Got unknown event %d", event_type);
         break;
@@ -102,7 +112,7 @@ static void ucm_event_call_orig(ucm_event_type_t event_type, ucm_event_t *event,
 static ucm_event_handler_t ucm_event_orig_handler = {
     .list     = UCS_LIST_INITIALIZER(&ucm_event_handlers, &ucm_event_handlers),
     .events   = UCM_EVENT_MMAP | UCM_EVENT_MUNMAP | UCM_EVENT_MREMAP |
-                UCM_EVENT_SHMAT | UCM_EVENT_SHMDT | UCM_EVENT_SBRK, /* All events */
+                UCM_EVENT_SHMAT | UCM_EVENT_SHMDT | UCM_EVENT_SBRK | UCM_EVENT_CUDAFREE, /* All events */
     .priority = 0,                      /* Between negative and positive handlers */
     .cb       = ucm_event_call_orig
 };
@@ -334,6 +344,27 @@ void *ucm_sbrk(intptr_t increment)
     return event.sbrk.result;
 }
 
+#if HAVE_CUDA
+cudaError_t ucm_cudaFree(void *addr)
+{
+    ucm_event_t event;
+
+    ucm_event_enter();
+
+    ucm_trace("ucm_cudaFree(addr=%p )", addr);
+
+    ucm_dispatch_vm_munmap(addr, 0);
+
+    event.cudaFree.result  = -1;
+    event.cudaFree.address = addr;
+    ucm_event_dispatch(UCM_EVENT_CUDAFREE, &event);
+
+    ucm_event_leave();
+
+    return event.cudaFree.result;
+}
+#endif
+
 void ucm_event_handler_add(ucm_event_handler_t *handler)
 {
     ucm_event_handler_t *elem;
@@ -390,6 +421,19 @@ static ucs_status_t ucm_event_install(int events)
     }
 
     ucm_debug("malloc hooks are ready");
+
+#if HAVE_CUDA
+    if (events & UCM_EVENT_VM_UNMAPPED) {
+        native_events = UCM_EVENT_CUDAFREE;
+    }
+    status = ucm_cudamem_install(native_events);
+    if (status != UCS_OK) {
+        ucm_debug("failed to install cudamem events");
+        goto out_unlock;
+    }
+    ucm_debug("cudaFree hooks are ready");
+#endif
+
     status = UCS_OK;
 
 out_unlock:
