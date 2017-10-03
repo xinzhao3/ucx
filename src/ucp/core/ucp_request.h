@@ -119,6 +119,12 @@ struct ucp_request {
                 } rndv_get;
 
                 struct {
+                    uint64_t      remote_address; /* address of the sender's data buffer */
+                    uintptr_t     remote_request; /* pointer to the sender's send request */
+                    uct_rkey_bundle_t rkey_bundle;
+                } rndv_put;
+
+                struct {
                     ucp_request_callback_t    flushed_cb;/* Called when flushed */
                     uct_worker_cb_id_t        slow_cb_id;/* Slow-path callback */
                     ucp_lane_map_t            lanes;     /* Which lanes need to be flushed */

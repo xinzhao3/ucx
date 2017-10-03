@@ -60,7 +60,7 @@ size_t ucp_tag_rndv_pack_rkey(ucp_request_t *sreq, ucp_lane_index_t lane,
         /* if the send buffer was registered, send the rkey */
         UCS_PROFILE_CALL(uct_md_mkey_pack, ucp_ep_md(ep, lane),
                          sreq->send.state.dt.contig.memh, rkey_buf);
-        *flags |= UCP_RNDV_RTS_FLAG_PACKED_RKEY;
+        *flags |= UCP_RNDV_FLAG_PACKED_RKEY;
         return ucp_ep_md_attr(ep, lane)->rkey_packed_size;
     }
 
@@ -108,6 +108,9 @@ static size_t ucp_tag_rndv_rtr_pack(void *dest, void *arg)
 {
     ucp_request_t *rndv_req = arg;   /* the receive's rndv_req */
     ucp_rndv_rtr_hdr_t *rndv_rtr_hdr = dest;
+    size_t packed_len = sizeof(*rndv_rtr_hdr);;
+    ucp_request_t *rreq = (ucp_request_t *)rndv_req->send.proto.rreq_ptr;
+    ucp_ep_t *ep = rndv_req->send.ep;
 
     /* sreq_ptr holds the sender's send req */
     rndv_rtr_hdr->sreq_ptr = rndv_req->send.proto.remote_request;
@@ -115,7 +118,18 @@ static size_t ucp_tag_rndv_rtr_pack(void *dest, void *arg)
     /* rreq_ptr holds the recv req on the recv side */
     rndv_rtr_hdr->rreq_ptr = rndv_req->send.proto.rreq_ptr;
 
-    return sizeof(*rndv_rtr_hdr);
+    if (UCP_DT_IS_CONTIG(rreq->send.datatype)) {
+        rndv_rtr_hdr->address = (uintptr_t) rreq->send.buffer;
+        if (ucp_ep_is_rndv_lane_present(ep)) {
+            rreq->send.ep = ep;
+            packed_len += ucp_tag_rndv_pack_rkey(rreq, ucp_ep_get_rndv_get_lane(ep),
+                                                 rndv_rtr_hdr + 1, &(rndv_rtr_hdr->flags));
+        }
+    } else {
+        rndv_rtr_hdr->address = 0;
+    }
+
+    return packed_len;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_proto_progress_rndv_rtr, (self),
@@ -350,7 +364,7 @@ static void ucp_rndv_handle_recv_contig(ucp_request_t *rndv_req, ucp_request_t *
         rndv_req->send.proto.remote_request = rndv_rts_hdr->sreq.reqptr;
         rndv_req->send.proto.rreq_ptr       = (uintptr_t) rreq;
     } else {
-        if (rndv_rts_hdr->flags & UCP_RNDV_RTS_FLAG_PACKED_RKEY) {
+        if (rndv_rts_hdr->flags & UCP_RNDV_FLAG_PACKED_RKEY) {
             UCS_PROFILE_CALL(uct_rkey_unpack, rndv_rts_hdr + 1,
                              &rndv_req->send.rndv_get.rkey_bundle);
         }
@@ -698,6 +712,13 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_rndv_rtr_handler,
         ucp_rndv_rma_request_send_buffer_dereg(sreq);
 
         sreq->send.uct.func = ucp_rndv_progress_bcopy_send;
+    }
+
+    sreq->send.rndv_put.remote_address = rndv_rtr_hdr->address;
+    sreq->send.rndv_put.remote_request = rndv_rtr_hdr->rreq_ptr;
+    if (rndv_rtr_hdr->flags & UCP_RNDV_FLAG_PACKED_RKEY) {
+        UCS_PROFILE_CALL(uct_rkey_unpack, rndv_rtr_hdr + 1,
+                         &sreq->send.rndv_put.rkey_bundle);
     }
 
     UCS_PROFILE_REQUEST_EVENT(sreq, "rndv_rtr_recv", 0);

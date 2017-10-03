@@ -14,8 +14,8 @@
 #include <ucp/proto/proto.h>
 
 enum {
-    UCP_RNDV_RTS_FLAG_PACKED_RKEY  = UCS_BIT(0),
-    UCP_RNDV_RTS_FLAG_OFFLOAD      = UCS_BIT(1)
+    UCP_RNDV_FLAG_PACKED_RKEY      = UCS_BIT(0),
+    UCP_RNDV_RTS_FLAG_OFFLOAD      = UCS_BIT(1),
 };
 
 /*
@@ -36,6 +36,8 @@ typedef struct {
 typedef struct {
     uintptr_t                 sreq_ptr; /* request on the rndv initiator side - sender */
     uintptr_t                 rreq_ptr; /* request on the rndv receiver side */
+    uint64_t                  address;  /* holds the address of the data buffer on the receiver's side */
+    uint16_t                  flags;
 } UCS_S_PACKED ucp_rndv_rtr_hdr_t;
 
 /*

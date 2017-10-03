@@ -82,7 +82,7 @@ static size_t ucp_tag_offload_fetch_rkey(ucp_ep_t *ep, ucp_sw_rndv_hdr_t *sw_hdr
     uint64_t *addr;
     size_t rkey_size;
 
-    if (!(sw_hdr->flags & UCP_RNDV_RTS_FLAG_PACKED_RKEY) || ucp_ep_is_stub(ep)) {
+    if (!(sw_hdr->flags & UCP_RNDV_FLAG_PACKED_RKEY) || ucp_ep_is_stub(ep)) {
         rts->address = 0;
         return 0;
     }
@@ -118,7 +118,7 @@ void ucp_tag_offload_rndv_cb(uct_tag_context_t *self, uct_tag_t stag,
         return;
     }
 
-    if ((sreq->flags & UCP_RNDV_RTS_FLAG_PACKED_RKEY) && !ucp_ep_is_stub(ep)) {
+    if ((sreq->flags & UCP_RNDV_FLAG_PACKED_RKEY) && !ucp_ep_is_stub(ep)) {
         length += ucp_ep_md_attr(ep, ucp_ep_get_tag_lane(ep))->rkey_packed_size;
     }
     rts = alloca(length);
@@ -169,7 +169,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_rndv,
         rts->flags = UCP_RNDV_RTS_FLAG_OFFLOAD;
         if (rkey_size) {
             memcpy(rts + 1, rkey_buf, rkey_size);
-            rts->flags |= UCP_RNDV_RTS_FLAG_PACKED_RKEY;
+            rts->flags |= UCP_RNDV_FLAG_PACKED_RKEY;
         }
     } else {
         /* This must be SW RNDV request. Take length from its header. */
