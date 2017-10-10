@@ -78,6 +78,7 @@ typedef void (*ucp_request_callback_t)(ucp_request_t *req);
 struct ucp_request {
     ucs_status_t                  status;  /* Operation status */
     uint16_t                      flags;   /* Request flags */
+    ucp_mem_type_t                mem_type;  /* Memory type handle */
 
     union {
         struct {
