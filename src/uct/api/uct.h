@@ -392,7 +392,7 @@ enum {
 typedef enum {
     UCT_MD_MEM_TYPE_DEFAULT = 0,   /**< Default system memory */
     UCT_MD_MEM_TYPE_CUDA,          /**< NVIDIA CUDA memory */
-    UCT_MD_MEM_TYPE_LAST    = UCT_MD_MEM_TYPE_CUDA
+    UCT_MD_MEM_TYPE_LAST
 } uct_memory_type_t;
 
 

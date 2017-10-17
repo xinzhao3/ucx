@@ -171,7 +171,7 @@ typedef struct ucp_ep_config {
 
         /* Configuration of the lane used for eager protocols
          * (can be AM or tag offload). */
-        ucp_ep_msg_config_t eager;
+        ucp_ep_msg_config_t eager[UCT_MD_MEM_TYPE_LAST];
 
         struct {
             /* Maximal total size of rndv_get_zcopy */
@@ -267,5 +267,5 @@ size_t ucp_ep_config_get_zcopy_auto_thresh(size_t iovcnt,
 ucp_lane_index_t ucp_config_find_domain_lane(const ucp_ep_config_t *config,
                                                  const ucp_lane_index_t *lanes,
                                                  ucp_md_map_t dn_md_map);
-ucs_status_t ucp_ep_set_domain_lanes(ucp_ep_h ep, ucp_mem_type_h mem_type_h);
+ucs_status_t ucp_ep_config_set_domain_lanes(ucp_worker_h worker, ucp_ep_config_t *ep_config, ucp_mem_type_h mem_type_h);
 #endif

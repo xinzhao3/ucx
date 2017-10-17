@@ -585,7 +585,9 @@ ucp_lane_index_t ucp_config_find_domain_lane(const ucp_ep_config_t *config,
     return UCP_NULL_LANE;
 }
 
-ucs_status_t ucp_ep_set_domain_lanes(ucp_ep_h ep, ucp_mem_type_h mem_type_h)
+ucs_status_t ucp_ep_config_set_domain_lanes(ucp_worker_h worker,
+                                            ucp_ep_config_t *ep_config,
+                                            ucp_mem_type_h mem_type_h)
 {
     ucp_rsc_index_t rsc_index;
     uct_iface_attr_t *iface_attr;
@@ -596,15 +598,15 @@ ucs_status_t ucp_ep_set_domain_lanes(ucp_ep_h ep, ucp_mem_type_h mem_type_h)
     dn_md_map = mem_type_h->md_map;
 
         while (1) {
-            dn_lane = ucp_config_find_domain_lane(ucp_ep_config(ep),
-                    ucp_ep_config(ep)->key.domain_lanes, dn_md_map);
+            dn_lane = ucp_config_find_domain_lane(ep_config,
+                                ep_config->key.domain_lanes, dn_md_map);
             if (dn_lane == UCP_NULL_LANE) {
                 ucs_error("Not find address domain lane.");
                 return UCS_ERR_IO_ERROR;
             }
-            rsc_index    = ucp_ep_get_rsc_index(ep, dn_lane);
-            iface_attr = &ep->worker->ifaces[rsc_index].attr;
-            md_index = ucp_ep_config(ep)->key.lanes[dn_lane].dst_md_index;
+            rsc_index = ep_config->key.lanes[dn_lane].rsc_index;
+            iface_attr = &worker->ifaces[rsc_index].attr;
+            md_index = ep_config->key.lanes[dn_lane].dst_md_index;
             if (iface_attr->cap.flags & UCT_IFACE_FLAG_PUT_ZCOPY) {
                 mem_type_h->eager_lane = dn_lane;
             }

@@ -348,7 +348,7 @@ ucp_do_tag_offload_zcopy(uct_pending_req_t *self, uint64_t imm_data,
 {
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
-    size_t max_iov     = ucp_ep_config(ep)->tag.eager.max_iov;
+    size_t max_iov     = ucp_ep_config(ep)->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_iov;
     uct_iov_t *iov     = ucs_alloca(max_iov * sizeof(uct_iov_t));
     size_t iovcnt      = 0;
     ucs_status_t status;
@@ -438,7 +438,7 @@ ucs_status_t ucp_tag_offload_rndv_zcopy(uct_pending_req_t *self)
 {
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
-    size_t max_iov     = ucp_ep_config(ep)->tag.eager.max_iov;
+    size_t max_iov     = ucp_ep_config(ep)->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_iov;
     uct_iov_t *iov     = ucs_alloca(max_iov * sizeof(uct_iov_t));
     size_t iovcnt      = 0;
     ucp_request_hdr_t rndv_hdr = {

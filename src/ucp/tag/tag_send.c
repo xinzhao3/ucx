@@ -41,7 +41,7 @@ static ucs_status_t ucp_tag_req_start(ucp_request_t *req, size_t count,
         req->send.state.dt.iov.iovcnt_offset = 0;
         req->send.state.dt.iov.iov_offset    = 0;
         req->send.state.dt.iov.iovcnt        = count;
-        flag_iov_single                      = (count <= config->tag.eager.max_iov);
+        flag_iov_single                      = (count <= config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_iov);
 
         if (!flag_iov_single && ucp_ep_is_tag_offload_enabled(config)) {
             /* Make sure SW RNDV will be used, because tag offload does
@@ -52,7 +52,7 @@ static ucs_status_t ucp_tag_req_start(ucp_request_t *req, size_t count,
         if (0 == count) {
             /* disable zcopy */
             zcopy_thresh = SIZE_MAX;
-        } else if (!config->tag.eager.zcopy_auto_thresh) {
+        } else if (!config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].zcopy_auto_thresh) {
             /* The user defined threshold or no zcopy enabled */
             zcopy_thresh = zcopy_thresh_arr[0];
         } else if (count <= UCP_MAX_IOV) {
@@ -94,7 +94,7 @@ static ucs_status_t ucp_tag_req_start(ucp_request_t *req, size_t count,
         UCS_PROFILE_REQUEST_EVENT(req, "start_rndv", req->send.length);
     } else if (length < zcopy_thresh) {
         /* bcopy */
-        if (length <= (config->tag.eager.max_bcopy - only_hdr_size)) {
+        if (length <= (config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_bcopy - only_hdr_size)) {
             req->send.uct.func   = proto->bcopy_single;
             UCS_PROFILE_REQUEST_EVENT(req, "start_egr_bcopy_single", req->send.length);
         } else {
@@ -111,7 +111,7 @@ static ucs_status_t ucp_tag_req_start(ucp_request_t *req, size_t count,
         req->send.uct_comp.func  = proto->zcopy_completion;
         req->send.uct_comp.count = 0;
 
-        if ((length <= (config->tag.eager.max_zcopy - only_hdr_size)) &&
+        if ((length <= (config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_zcopy - only_hdr_size)) &&
             flag_iov_single) {
             req->send.uct.func   = proto->zcopy_single;
             UCS_PROFILE_REQUEST_EVENT(req, "start_egr_zcopy_single", req->send.length);
@@ -138,7 +138,7 @@ static void ucp_tag_req_start_generic(ucp_request_t *req, size_t count,
     req->send.state.dt.generic.state = state;
     req->send.length = length = dt_gen->ops.packed_size(state);
 
-    if (length <= config->tag.eager.max_bcopy - proto->only_hdr_size) {
+    if (length <= config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_bcopy - proto->only_hdr_size) {
         /* bcopy single */
         req->send.uct.func = proto->bcopy_single;
         UCS_PROFILE_REQUEST_EVENT(req, "start_gen_bcopy_single", req->send.length);
@@ -238,14 +238,11 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
                   buffer, count, tag, ucp_ep_peer_name(ep), cb);
 
     ucp_addr_domain_detect_mds(ep->worker->context, (void *)buffer, &mem_type);
-    if (ucs_likely(!UCP_IS_DEFAULT_MEMORY_TYPE(mem_type.id))) {
-        ucp_ep_set_domain_lanes(ep, &mem_type);
-    }
 
     if (ucs_likely(UCP_IS_DEFAULT_MEMORY_TYPE(mem_type.id)) &&
                         ucs_likely(UCP_DT_IS_CONTIG(datatype))) {
         length = ucp_contig_dt_length(datatype, count);
-        if (ucs_likely((ssize_t)length <= ucp_ep_config(ep)->tag.eager.max_short)) {
+        if (ucs_likely((ssize_t)length <= ucp_ep_config(ep)->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].max_short)) {
             status = UCS_PROFILE_CALL(ucp_tag_send_eager_short, ep, tag, buffer,
                                       length);
             if (ucs_likely(status != UCS_ERR_NO_RESOURCE)) {
@@ -265,12 +262,8 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
     ucp_tag_send_req_init(req, ep, buffer, datatype, tag, 0, mem_type);
 
     ret = ucp_tag_send_req(req, count,
-                           ucs_likely(UCP_IS_DEFAULT_MEMORY_TYPE(mem_type.id)) ?
-                                    ucp_ep_config(ep)->tag.eager.max_short :
-                                    ucp_ep_config(ep)->domain[mem_type.eager_lane].tag.eager.max_short,
-                           ucs_likely(UCP_IS_DEFAULT_MEMORY_TYPE(mem_type.id)) ?
-                                    ucp_ep_config(ep)->tag.eager.zcopy_thresh :
-                                    ucp_ep_config(ep)->domain[mem_type.eager_lane].tag.eager.zcopy_thresh,
+                           ucp_ep_config(ep)->tag.eager[mem_type.id].max_short,
+                           ucp_ep_config(ep)->tag.eager[mem_type.id].zcopy_thresh,
                            ucp_ep_config(ep)->tag.rndv.rma_thresh,
                            ucp_ep_config(ep)->tag.rndv.am_thresh,
                            cb, ucp_ep_config(ep)->tag.proto);
@@ -312,7 +305,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
 
     ret = ucp_tag_send_req(req, count,
                            -1, /* disable short method */
-                           ucp_ep_config(ep)->tag.eager.sync_zcopy_thresh,
+                           ucp_ep_config(ep)->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].sync_zcopy_thresh,
                            ucp_ep_config(ep)->tag.rndv.rma_thresh,
                            ucp_ep_config(ep)->tag.rndv.am_thresh,
                            cb, ucp_ep_config(ep)->tag.sync_proto);

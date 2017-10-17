@@ -912,10 +912,10 @@ void ucp_ep_config_init(ucp_worker_h worker, ucp_ep_config_t *config)
     for (it = 0; it < UCP_MAX_IOV; ++it) {
         config->am.zcopy_thresh[it]              = SIZE_MAX;
         config->am.sync_zcopy_thresh[it]         = SIZE_MAX;
-        config->tag.eager.zcopy_thresh[it]       = SIZE_MAX;
-        config->tag.eager.sync_zcopy_thresh[it]  = SIZE_MAX;
+        config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].zcopy_thresh[it]      = SIZE_MAX;
+        config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].sync_zcopy_thresh[it] = SIZE_MAX;
     }
-    config->tag.eager.zcopy_auto_thresh = 0;
+    config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT].zcopy_auto_thresh = 0;
     config->am.zcopy_auto_thresh        = 0;
     config->p2p_lanes                   = 0;
     config->domain_lanes                = 0;
@@ -946,7 +946,7 @@ void ucp_ep_config_init(ucp_worker_h worker, ucp_ep_config_t *config)
         rsc_index = config->key.lanes[lane].rsc_index;
         if (rsc_index != UCP_NULL_RESOURCE) {
             iface_attr = &worker->ifaces[rsc_index].attr;
-            ucp_ep_config_init_attrs(worker, rsc_index, &config->tag.eager,
+            ucp_ep_config_init_attrs(worker, rsc_index, &(config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT]),
                                      iface_attr->cap.tag.eager.max_short,
                                      iface_attr->cap.tag.eager.max_bcopy,
                                      iface_attr->cap.tag.eager.max_zcopy,
@@ -997,7 +997,7 @@ void ucp_ep_config_init(ucp_worker_h worker, ucp_ep_config_t *config)
                 ucp_ep_config_set_rndv_thresh(worker, config, config->key.rndv_lane,
                                               UCT_IFACE_FLAG_GET_ZCOPY,
                                               max_rndv_thresh);
-                config->tag.eager      = config->am;
+                config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT] = config->am;
                 config->tag.lane       = lane;
             }
         } else {
@@ -1021,6 +1021,24 @@ void ucp_ep_config_init(ucp_worker_h worker, ucp_ep_config_t *config)
         //TODO: zcopy threshold should be based on the ep AM lane capability with domain addr(i.e  can UCT  do zcopy from domain)
         memset(domain_config->tag.eager.zcopy_thresh, 0, UCP_MAX_IOV * sizeof(size_t));
 
+    }
+
+    for (it = 0; it < UCT_MD_MEM_TYPE_LAST; it++) {
+        config->tag.eager[it] = config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT];
+        if (!UCP_IS_DEFAULT_MEMORY_TYPE(it)) {
+            ucp_mem_type_t mem_type;
+            unsigned md_index;
+            mem_type.id = it;
+            mem_type.md_map = 0;
+            for (md_index = 0; md_index < context->num_mds; md_index++) {
+                if (context->tl_mds[md_index].attr.cap.mem_type == it) {
+                    mem_type.md_map |= UCS_BIT(md_index);
+                }
+            }
+            ucp_ep_config_set_domain_lanes(worker, config, &mem_type);
+            config->tag.eager[it].max_short = config->domain[mem_type.eager_lane].tag.eager.max_short;
+            memcpy(config->tag.eager[it].zcopy_thresh, config->domain[mem_type.eager_lane].tag.eager.zcopy_thresh, UCP_MAX_IOV * sizeof(size_t));
+        }
     }
 
     /* Configuration for remote memory access */
@@ -1245,7 +1263,7 @@ static void ucp_ep_config_print(FILE *stream, ucp_worker_h worker,
 
     if (context->config.features & UCP_FEATURE_TAG) {
          tag_config = (ucp_ep_is_tag_offload_enabled((ucp_ep_config_t *)config)) ?
-                       &config->tag.eager : &config->am;
+                       &config->tag.eager[UCT_MD_MEM_TYPE_DEFAULT] : &config->am;
          ucp_ep_config_print_tag_proto(stream, "tag_send",
                                        tag_config->max_short,
                                        tag_config->zcopy_thresh[0],
