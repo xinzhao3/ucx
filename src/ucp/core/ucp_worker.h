@@ -164,6 +164,7 @@ typedef struct ucp_worker {
     uint64_t                      uuid;          /* Unique ID for wireup */
     uct_worker_h                  uct;           /* UCT worker handle */
     ucs_mpool_t                   req_mp;        /* Memory pool for requests */
+    ucs_mpool_t                   rndv_frag_mp;  /* Memory pool for RNDV fragments */
     uint64_t                      atomic_tls;    /* Which resources can be used for atomics */
 
     int                           inprogress;
