@@ -97,6 +97,7 @@ struct ucp_request {
             size_t                length;   /* Total length, in bytes */
             uct_memory_type_t     mem_type; /* Memory type for send buffer */
             ucp_send_callback_t   cb;       /* Completion callback */
+            ucp_ep_h              dummy_ep;
 
             union {
                 ucp_tag_t         tag;      /* Tagged send */
