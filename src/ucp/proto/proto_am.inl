@@ -266,6 +266,10 @@ ucp_proto_get_zcopy_threshold(const ucp_request_t *req,
         return max_zcopy;
     }
 
+    if (ucs_unlikely(!UCP_MEM_IS_HOST(req->send.mem_type))) {
+        return 1;
+    }
+
     if (ucs_likely(UCP_DT_IS_CONTIG(req->send.datatype))) {
         return ucs_min(max_zcopy, msg_config->zcopy_thresh[0]);
     } else if (UCP_DT_IS_IOV(req->send.datatype)) {
@@ -302,7 +306,8 @@ static UCS_F_ALWAYS_INLINE ssize_t
 ucp_proto_get_short_max(const ucp_request_t *req,
                         const ucp_ep_msg_config_t *msg_config)
 {
-    return (!UCP_DT_IS_CONTIG(req->send.datatype) ||
-            (req->flags & UCP_REQUEST_FLAG_SYNC)) ?
+    return  (!UCP_DT_IS_CONTIG(req->send.datatype) ||
+            (req->flags & UCP_REQUEST_FLAG_SYNC) ||
+            (!UCP_MEM_IS_HOST(req->send.mem_type))) ?
            -1 : msg_config->max_short;
 }

@@ -106,13 +106,14 @@ ucp_tag_send_req(ucp_request_t *req, size_t count,
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep, const void* buffer,
-                      uintptr_t datatype, size_t count, ucp_tag_t tag,
-                      uint16_t flags)
+                      uintptr_t datatype, size_t count, uct_memory_type_t mem_type,
+                      ucp_tag_t tag, uint16_t flags)
 {
     req->flags             = flags;
     req->send.ep           = ep;
     req->send.buffer       = buffer;
     req->send.datatype     = datatype;
+    req->send.mem_type     = mem_type;
     req->send.tag          = tag;
     ucp_request_send_state_init(req, datatype, count);
     req->send.length       = ucp_dt_length(req->send.datatype, count,
@@ -130,13 +131,17 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
     ucp_request_t *req;
     size_t length;
     ucs_status_ptr_t ret;
+    uct_memory_type_t mem_type;
 
     UCP_THREAD_CS_ENTER_CONDITIONAL(&ep->worker->mt_lock);
 
     ucs_trace_req("send_nb buffer %p count %zu tag %"PRIx64" to %s cb %p",
                   buffer, count, tag, ucp_ep_peer_name(ep), cb);
 
-    if (ucs_likely(UCP_DT_IS_CONTIG(datatype))) {
+    /* Detect memory type */
+    ucp_memory_type_detect_mds(ep->worker->context, (void *)buffer, count, &mem_type);
+
+    if (ucs_likely(UCP_DT_IS_CONTIG(datatype)) && ucs_likely(UCP_MEM_IS_HOST(mem_type))) {
         length = ucp_contig_dt_length(datatype, count);
         if (ucs_likely((ssize_t)length <= ucp_ep_config(ep)->tag.eager.max_short)) {
             status = UCS_PROFILE_CALL(ucp_tag_send_eager_short, ep, tag, buffer,
@@ -155,7 +160,8 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
         goto out;
     }
 
-    ucp_tag_send_req_init(req, ep, buffer, datatype, count, tag, 0);
+    ucp_tag_send_req_init(req, ep, buffer, datatype, count, mem_type, tag, 0);
+
 
     ret = ucp_tag_send_req(req, count, &ucp_ep_config(ep)->tag.eager,
                            ucp_ep_config(ep)->tag.rndv.rma_thresh,
@@ -173,6 +179,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
 {
     ucp_request_t *req;
     ucs_status_ptr_t ret;
+    uct_memory_type_t mem_type;
 
     UCP_THREAD_CS_ENTER_CONDITIONAL(&ep->worker->mt_lock);
 
@@ -193,7 +200,10 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
     /* Remote side needs to send reply, so have it connect to us */
     ucp_ep_connect_remote(ep);
 
-    ucp_tag_send_req_init(req, ep, buffer, datatype, count, tag,
+    /* Detect memory type */
+    ucp_memory_type_detect_mds(ep->worker->context, (void *)buffer, count, &mem_type);
+
+    ucp_tag_send_req_init(req, ep, buffer, datatype, count, mem_type, tag,
                           UCP_REQUEST_FLAG_SYNC);
 
     ret = ucp_tag_send_req(req, count, &ucp_ep_config(ep)->tag.eager,

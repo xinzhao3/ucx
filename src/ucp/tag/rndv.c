@@ -816,9 +816,9 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_rndv_data_handler,
     }
 
     UCS_PROFILE_REQUEST_EVENT(rreq, "rndv_data_recv", recv_len);
-    status = ucp_dt_unpack(rreq->recv.datatype, rreq->recv.buffer,
-                           rreq->recv.length, &rreq->recv.state,
-                           data + hdr_len, recv_len, 0);
+    status = ucp_dt_unpack(rreq->recv.worker, rreq->recv.datatype, rreq->recv.buffer,
+                           rreq->recv.length, rreq->recv.mem_type,
+                           &rreq->recv.state, data + hdr_len, recv_len, 0);
     if ((status == UCS_OK) || (status == UCS_INPROGRESS)) {
         rreq->recv.state.offset += recv_len;
         return status;
@@ -850,9 +850,9 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_rndv_data_last_handler,
         ucs_assert(rreq->recv.tag.info.length ==
                    rreq->recv.state.offset + recv_len);
         UCS_PROFILE_REQUEST_EVENT(rreq, "rndv_data_last_recv", recv_len);
-        status = ucp_dt_unpack(rreq->recv.datatype, rreq->recv.buffer,
-                               rreq->recv.length, &rreq->recv.state,
-                               data + hdr_len, recv_len,
+        status = ucp_dt_unpack(rreq->recv.worker, rreq->recv.datatype, rreq->recv.buffer,
+                               rreq->recv.length, rreq->recv.mem_type,
+                               &rreq->recv.state, data + hdr_len, recv_len,
                                UCP_RECV_DESC_FLAG_LAST);
     } else {
         ucs_trace_data("drop last segment for rreq %p, length %zu, status %s",

@@ -164,4 +164,6 @@ ucp_memh2uct(ucp_mem_h memh, ucp_md_index_t md_idx)
         status; \
     })
 
+#define UCP_MEM_IS_HOST(mem_type) (mem_type == UCT_MD_MEM_TYPE_HOST)
+
 #endif

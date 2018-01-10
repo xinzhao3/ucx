@@ -26,12 +26,14 @@ ucp_stream_send_am_short(ucp_ep_t *ep, const void *buffer, size_t length)
 
 static void ucp_stream_send_req_init(ucp_request_t* req, ucp_ep_h ep,
                                      const void* buffer, uintptr_t datatype,
-                                     size_t count, uint16_t flags)
+                                     size_t count, uct_memory_type_t mem_type,
+                                     uint16_t flags)
 {
     req->flags             = flags;
     req->send.ep           = ep;
     req->send.buffer       = buffer;
     req->send.datatype     = datatype;
+    req->send.mem_type     = mem_type;
     req->send.lane         = ep->am_lane;
     ucp_request_send_state_init(req, datatype, count);
     req->send.length       = ucp_dt_length(req->send.datatype, count,
@@ -113,7 +115,8 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_stream_send_nb,
         goto out;
     }
 
-    ucp_stream_send_req_init(req, ep, buffer, datatype, count, flags);
+    ucp_stream_send_req_init(req, ep, buffer, datatype, count,
+                             UCT_MD_MEM_TYPE_HOST, flags);
 
     ret = ucp_stream_send_req(req, count, &ucp_ep_config(ep)->am, cb,
                               ucp_ep_config(ep)->stream.proto);

@@ -156,8 +156,9 @@ ucp_stream_rdata_unpack(const void *rdata, size_t length, ucp_request_t *dst_req
                                       dst_req->recv.state.offset), length);
     ucs_status_t status;
 
-    status = ucp_dt_unpack(dst_req->recv.datatype, dst_req->recv.buffer,
-                           dst_req->recv.length, &dst_req->recv.state,
+    status = ucp_dt_unpack(dst_req->recv.worker, dst_req->recv.datatype,
+                           dst_req->recv.buffer, dst_req->recv.length,
+                           UCT_MD_MEM_TYPE_HOST, &dst_req->recv.state,
                            rdata, valid_len, UCP_RECV_DESC_FLAG_LAST);
 
     if (ucs_likely(status == UCS_OK)) {
@@ -198,7 +199,8 @@ ucp_stream_process_rdesc_inplace(ucp_recv_desc_t *rdesc, ucp_datatype_t dt,
     ucs_status_t status;
     ssize_t unpacked;
 
-    status   = ucp_dt_unpack(dt, buffer, length, state,
+    status   = ucp_dt_unpack(ep_stream->ucp_ep->worker, dt, buffer,
+                             length, UCT_MD_MEM_TYPE_HOST, state,
                              ucp_stream_rdesc_payload(rdesc), length,
                              UCP_RECV_DESC_FLAG_LAST);
     unpacked = ucs_likely(status == UCS_OK) ? length : status;

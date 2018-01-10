@@ -95,6 +95,7 @@ struct ucp_request {
             const void            *buffer;  /* Send buffer */
             ucp_datatype_t        datatype; /* Send type */
             size_t                length;   /* Total length, in bytes */
+            uct_memory_type_t     mem_type; /* Memory type */
             ucp_send_callback_t   cb;       /* Completion callback */
 
             union {
@@ -192,6 +193,7 @@ struct ucp_request {
             void                  *buffer;  /* Buffer to receive data to */
             ucp_datatype_t        datatype; /* Receive type */
             size_t                length;   /* Total length, in bytes */
+            uct_memory_type_t     mem_type; /* Memory type */
             ucp_dt_state_t        state;
             ucp_worker_t          *worker;
             ucp_mem_desc_t        *rdesc;
