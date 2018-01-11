@@ -18,6 +18,7 @@ size_t ucp_tag_rndv_rts_pack(void *dest, void *arg)
     ucp_request_t *sreq              = arg;   /* send request */
     ucp_rndv_rts_hdr_t *rndv_rts_hdr = dest;
     ucp_worker_h worker              = sreq->send.ep->worker;
+    ucp_rndv_mode_t rndv_mode        = worker->context->config.ext.rndv_mode;
     ssize_t packed_rkey_size;
 
     rndv_rts_hdr->super.tag        = sreq->send.tag;
@@ -26,7 +27,10 @@ size_t ucp_tag_rndv_rts_pack(void *dest, void *arg)
     rndv_rts_hdr->size             = sreq->send.length;
 
     /* Pack remote keys (which can be empty list) */
-    if (UCP_DT_IS_CONTIG(sreq->send.datatype)) {
+    if (UCP_DT_IS_CONTIG(sreq->send.datatype) &&
+        (rndv_mode == UCP_RNDV_MODE_GET_ZCOPY ||
+         (rndv_mode == UCP_RNDV_MODE_AUTO && UCP_MEM_IS_HOST(sreq->send.mem_type)))) {
+        /* pack rkey, ask target to do get_zcopy */
         rndv_rts_hdr->address = (uintptr_t)sreq->send.buffer;
         packed_rkey_size = ucp_rkey_pack_uct(worker->context,
                                              sreq->send.state.dt.dt.contig.md_map,
