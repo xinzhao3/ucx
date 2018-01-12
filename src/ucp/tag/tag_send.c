@@ -55,6 +55,7 @@ ucp_tag_send_req(ucp_request_t *req, size_t count,
     size_t zcopy_thresh = ucp_proto_get_zcopy_threshold(req, msg_config, count,
                                                         rndv_thresh);
     ssize_t max_short   = ucp_proto_get_short_max(req, msg_config);
+    ucp_rndv_mode_t rndv_mode;
     ucs_status_t status;
 
     ucs_trace_req("select tag request(%p) progress algorithm datatype=%lx "
@@ -62,6 +63,12 @@ ucp_tag_send_req(ucp_request_t *req, size_t count,
                   "zcopy_thresh=%zu",
                   req, req->send.datatype, req->send.buffer, req->send.length,
                   max_short, rndv_thresh, zcopy_thresh);
+
+    rndv_mode = req->send.ep->worker->context->config.ext.rndv_mode;
+    if (UCP_DT_IS_CONTIG(req->send.datatype) && rndv_mode == UCP_RNDV_MODE_AUTO) {
+        ucp_memory_type_detect_mds(req->send.ep->worker->context, (void *)req->send.buffer,
+                                   req->send.length, &req->send.mem_type);
+    }
 
     status = ucp_request_send_start(req, max_short, zcopy_thresh, seg_size,
                                     rndv_thresh, proto);
@@ -119,6 +126,7 @@ ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep, const void* buffer,
                                            req->send.buffer,
                                            &req->send.state.dt);
     req->send.lane         = ucp_ep_config(ep)->tag.lane;
+    req->send.mem_type     = UCT_MD_MEM_TYPE_HOST;
 }
 
 UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
