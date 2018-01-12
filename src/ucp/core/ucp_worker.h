@@ -164,6 +164,7 @@ typedef struct ucp_worker {
     uint64_t                      uuid;          /* Unique ID for wireup */
     uct_worker_h                  uct;           /* UCT worker handle */
     ucs_mpool_t                   req_mp;        /* Memory pool for requests */
+    ucs_mpool_t                   rndv_frag_mp;  /* Memory pool for RNDV fragments */
     uint64_t                      atomic_tls;    /* Which resources can be used for atomics */
 
     int                           inprogress;
@@ -186,6 +187,8 @@ typedef struct ucp_worker {
     ucs_mpool_t                   reg_mp;        /* Registered memory pool */
     ucp_mt_lock_t                 mt_lock;       /* Configuration of multi-threading support */
     ucp_tag_match_t               tm;            /* Tag-matching queues and offload info */
+    uint64_t                      mem_type_tls[UCT_MD_MEM_TYPE_LAST];/* memory type tls */
+    ucp_ep_h                      mem_type_ep[UCT_MD_MEM_TYPE_LAST];/* memory type eps */
 
     UCS_STATS_NODE_DECLARE(stats);
     UCS_STATS_NODE_DECLARE(tm_offload_stats);

@@ -555,4 +555,16 @@ void ucp_mpool_obj_init(ucs_mpool_t *mp, void *obj, void *chunk)
     elem_hdr->memh = chunk_hdr->memh;
 }
 
+ucs_status_t ucp_frag_mpool_malloc(ucs_mpool_t *mp, size_t *size_p, void **chunk_p)
+{
+    *chunk_p = ucs_malloc(*size_p, ucs_mpool_name(mp));
+    if (*chunk_p == NULL) {
+        return UCS_ERR_NO_MEMORY;
+    }
+    return UCS_OK;
+}
 
+void ucp_frag_mpool_free(ucs_mpool_t *mp, void *chunk)
+{
+    ucs_free(chunk);
+}

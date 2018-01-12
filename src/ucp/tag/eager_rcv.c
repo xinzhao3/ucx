@@ -69,9 +69,9 @@ ucp_eager_handler(void *arg, void *data, size_t length, unsigned am_flags,
     if (req != NULL) {
         UCS_PROFILE_REQUEST_EVENT(req, "eager_recv", recv_len);
 
-        status = ucp_dt_unpack(req->recv.datatype, req->recv.buffer,
-                               req->recv.length, &req->recv.state,
-                               data + hdr_len, recv_len,
+        status = ucp_dt_unpack(worker, req->recv.datatype, req->recv.buffer,
+                               req->recv.length, req->recv.mem_type,
+                               &req->recv.state, data + hdr_len, recv_len,
                                flags & UCP_RECV_DESC_FLAG_LAST);
 
         /* First fragment fills the receive information */

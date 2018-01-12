@@ -30,6 +30,7 @@ ucp_tag_search_unexp(ucp_worker_h worker, void *buffer, size_t buffer_size,
                      unsigned *save_rreq)
 {
     ucp_recv_desc_t *rdesc, *next;
+    uct_memory_type_t mem_type;
     ucs_list_link_t *list;
     ucs_status_t status;
     ucp_tag_t recv_tag;
@@ -81,10 +82,12 @@ ucp_tag_search_unexp(ucp_worker_h worker, void *buffer, size_t buffer_size,
                               "unexpected");
             ucp_tag_unexp_remove(rdesc);
 
+            ucp_memory_type_detect_mds(worker->context, (void *)buffer, buffer_size, &mem_type);
+
             if (rdesc->flags & UCP_RECV_DESC_FLAG_EAGER) {
                 UCS_PROFILE_REQUEST_EVENT(req, "eager_match", 0);
                 status = ucp_eager_unexp_match(worker, rdesc, recv_tag, flags,
-                                               buffer, buffer_size, datatype,
+                                               buffer, buffer_size, mem_type, datatype,
                                                &req->recv.state, info);
                 if (status != UCS_INPROGRESS) {
                     goto out_release_desc;
@@ -98,6 +101,7 @@ ucp_tag_search_unexp(ucp_worker_h worker, void *buffer, size_t buffer_size,
                 *save_rreq         = 0;
                 req->recv.buffer   = buffer;
                 req->recv.length   = buffer_size;
+                req->recv.mem_type = mem_type;
                 req->recv.datatype = datatype;
                 req->recv.tag.cb   = cb;
                 ucp_rndv_matched(worker, req, (void*)(rdesc + 1));
@@ -158,6 +162,7 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
     ucp_request_queue_t *req_queue;
     ucs_status_t status;
     size_t buffer_size;
+    uct_memory_type_t mem_type;
 
     ucp_tag_recv_request_init(req, worker, buffer, count, datatype, req_flags);
     buffer_size = ucp_dt_length(datatype, count, buffer, &req->recv.state);
@@ -179,10 +184,12 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
         /* If not found on unexpected, wait until it arrives.
          * If was found but need this receive request for later completion, save it */
         req_queue = ucp_tag_exp_get_queue(&worker->tm, tag, tag_mask);
+        ucp_memory_type_detect_mds(worker->context, (void *)buffer, buffer_size, &mem_type);
 
         req->recv.buffer        = buffer;
         req->recv.length        = buffer_size;
         req->recv.datatype      = datatype;
+        req->recv.mem_type      = mem_type;
         req->recv.tag.tag       = tag;
         req->recv.tag.tag_mask  = tag_mask;
         req->recv.tag.cb        = cb;
